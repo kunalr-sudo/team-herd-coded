@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { HOURS, TIMELINE } from '../sim/constants'
+import type { LightingMode } from '../sim/daylight'
 import {
   NAIVE_FIX,
   NO_INTERVENTION,
@@ -29,6 +30,12 @@ interface SimState {
   plan: InterventionConfig
   planKind: PlanKind
   bundle: CounterfactualBundle
+  lighting: LightingMode
+  controlsOpen: boolean
+  insightsOpen: boolean
+  projectionOpen: boolean
+  /** Timestamp of the last crisis/plan change (drives the "projection updated" feedback). */
+  changedAt: number
   setHour: (h: number) => void
   advance: (dh: number) => void
   togglePlay: () => void
@@ -39,6 +46,14 @@ interface SimState {
   setCrisis: (c: Partial<CrisisConfig>) => void
   setPlan: (p: Partial<InterventionConfig>) => void
   applyPreset: (id: PresetId) => void
+  applyRecommendation: () => void
+  resetPlan: () => void
+  setLighting: (m: LightingMode) => void
+  toggleControls: () => void
+  toggleInsights: () => void
+  setProjectionOpen: (open: boolean) => void
+  /** Rewind to Hour 0 and play the chosen scenario from the start. */
+  startRun: () => void
 }
 
 const DEFAULT_CRISIS: CrisisConfig = { heatwaveTemp: 38, fanBFault: true }
@@ -56,12 +71,17 @@ export const useSim = create<SimState>((set, get) => ({
   playing: false,
   speed: 6,
   xray: false,
-  heatmap: 'heat',
+  heatmap: 'none',
   selectedPen: null,
   preset: null,
   crisis: DEFAULT_CRISIS,
   plan: NO_INTERVENTION,
   ...initial,
+  lighting: 'auto',
+  controlsOpen: true,
+  insightsOpen: true,
+  projectionOpen: false,
+  changedAt: 0,
 
   setHour: (h) => set({ hour: clampHour(Math.round(h)), preset: null }),
   advance: (dh) => {
@@ -82,11 +102,11 @@ export const useSim = create<SimState>((set, get) => ({
   selectPen: (p) => set({ selectedPen: p }),
   setCrisis: (c) => {
     const crisis = { ...get().crisis, ...c }
-    set({ crisis, preset: null, ...compute(crisis, get().plan) })
+    set({ crisis, preset: null, changedAt: Date.now(), ...compute(crisis, get().plan) })
   },
   setPlan: (p) => {
     const plan = { ...get().plan, ...p }
-    set({ plan, preset: null, ...compute(get().crisis, plan) })
+    set({ plan, preset: null, changedAt: Date.now(), ...compute(get().crisis, plan) })
   },
   applyPreset: (id) => {
     const crisis = DEFAULT_CRISIS
@@ -104,8 +124,21 @@ export const useSim = create<SimState>((set, get) => ({
       4: { hour: 72, xray: true, heatmap: 'germ' },
     }
     const plan = plans[id]
-    set({ crisis, plan, preset: id, playing: false, selectedPen: null, ...view[id], ...compute(crisis, plan) })
+    set({ crisis, plan, preset: id, playing: false, selectedPen: null, changedAt: Date.now(), ...view[id], ...compute(crisis, plan) })
   },
+  applyRecommendation: () => {
+    const plan = { ...SMART_PROTOCOL, actionHour: get().plan.actionHour }
+    set({ plan, preset: null, changedAt: Date.now(), ...compute(get().crisis, plan) })
+  },
+  resetPlan: () => {
+    const plan = { ...NO_INTERVENTION, actionHour: get().plan.actionHour }
+    set({ plan, preset: null, changedAt: Date.now(), ...compute(get().crisis, plan) })
+  },
+  setLighting: (m) => set({ lighting: m }),
+  toggleControls: () => set({ controlsOpen: !get().controlsOpen }),
+  toggleInsights: () => set({ insightsOpen: !get().insightsOpen }),
+  setProjectionOpen: (open) => set({ projectionOpen: open }),
+  startRun: () => set({ hour: 0, playing: true, preset: null, selectedPen: null, projectionOpen: false }),
 }))
 
 // Warm the JIT and the flow-field cache shortly after first paint so the first

@@ -1,51 +1,30 @@
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { HERD_SIZE } from '../../sim/constants'
 import { D, E, HERD, I, P, cowTargets } from '../../sim/cattleEngine'
 import { useSim } from '../../store/useSimulationStore'
 import { STATE_COLORS, wx, wz } from './coords'
-
-function buildCowGeometry() {
-  const parts: THREE.BufferGeometry[] = []
-  const add = (w: number, h: number, d: number, x: number, y: number, z: number, shade: number) => {
-    const g = new THREE.BoxGeometry(w, h, d)
-    g.translate(x, y, z)
-    const n = g.attributes.position.count
-    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(shade), 3))
-    parts.push(g)
-  }
-  add(0.3, 0.26, 0.6, 0, 0.36, 0, 1) // body
-  add(0.31, 0.12, 0.2, 0, 0.4, -0.08, 0.82) // patch
-  add(0.18, 0.18, 0.22, 0, 0.48, 0.38, 1) // head
-  add(0.12, 0.09, 0.08, 0, 0.43, 0.51, 0.3) // muzzle
-  add(0.09, 0.04, 0.05, 0.13, 0.55, 0.33, 0.75) // ears
-  add(0.09, 0.04, 0.05, -0.13, 0.55, 0.33, 0.75)
-  for (const x of [-0.1, 0.1]) for (const z of [-0.21, 0.21]) add(0.07, 0.24, 0.07, x, 0.12, z, 0.3) // legs
-  add(0.03, 0.22, 0.03, 0, 0.3, -0.31, 0.45) // tail
-  const merged = mergeGeometries(parts)!
-  parts.forEach((g) => g.dispose())
-  return merged
-}
+import { makeCowGeometry, makeCowMaterial } from './cowModel'
 
 const COL = {
-  healthy: new THREE.Color(STATE_COLORS.healthy).multiplyScalar(0.85),
+  healthy: new THREE.Color(0.96, 0.96, 0.94),
   quiet: new THREE.Color(STATE_COLORS.quiet),
   sick: new THREE.Color(STATE_COLORS.sick),
-  protected: new THREE.Color(STATE_COLORS.protected).multiplyScalar(1.1),
+  protected: new THREE.Color(STATE_COLORS.protected).multiplyScalar(1.25),
   dead: new THREE.Color(STATE_COLORS.dead),
 }
 
 export default function CattleInstances() {
   const mesh = useRef<THREE.InstancedMesh>(null)
-  const geometry = useMemo(() => buildCowGeometry(), [])
+  const geometry = useMemo(() => makeCowGeometry(HERD_SIZE, 42), [])
+  const material = useMemo(() => makeCowMaterial(), [])
   const frame = useSim((s) => s.bundle.current.frames[s.hour])
   const target = useMemo(() => cowTargets(frame, new Float32Array(HERD_SIZE * 4)), [frame])
   const cur = useRef<Float32Array | null>(null)
 
   const tmp = useMemo(
-    () => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler(0, 0, 0, 'YXZ'), p: new THREE.Vector3(), s: new THREE.Vector3(1.12, 1.12, 1.12), c: new THREE.Color() }),
+    () => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler(0, 0, 0, 'YXZ'), p: new THREE.Vector3(), s: new THREE.Vector3(1.25, 1.25, 1.25), c: new THREE.Color() }),
     [],
   )
 
@@ -93,8 +72,6 @@ export default function CattleInstances() {
   })
 
   return (
-    <instancedMesh ref={mesh} args={[geometry, undefined, HERD_SIZE]} frustumCulled={false}>
-      <meshLambertMaterial vertexColors />
-    </instancedMesh>
+    <instancedMesh ref={mesh} args={[geometry, material, HERD_SIZE]} frustumCulled={false} />
   )
 }

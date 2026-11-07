@@ -1,14 +1,17 @@
 import { OrbitControls, OrthographicCamera } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
+import { Bloom, EffectComposer, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { ToneMappingMode } from 'postprocessing'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import * as THREE from 'three'
 import { FANS, GRID_H, GRID_W, PENS, TIMELINE } from '../../sim/constants'
+import { daylightFor } from '../../sim/daylight'
 import { LEVEL_COLOR, penStatus } from '../../sim/narrative'
 import { useSim } from '../../store/useSimulationStore'
 import AirflowParticles from './AirflowParticles'
 import CattleInstances from './CattleInstances'
+import { DayNightRig, Grass, Ground, Trees } from './Environment'
 import HeatmapFloor from './HeatmapFloor'
 import PenOverlays from './PenOverlays'
 import SceneHtml from './SceneHtml'
@@ -20,16 +23,16 @@ const HALF_H = GRID_H / 2
 const WALL_H = 2.6
 const RIDGE_H = 4.4
 
-function IsoCamera() {
+function IsoCamera({ sidePanels }: { sidePanels: boolean }) {
   const size = useThree((s) => s.size)
   const ref = useRef<THREE.OrthographicCamera>(null)
   useEffect(() => {
     if (!ref.current) return
     // Leave room for the side HUD panels.
-    const usableW = Math.max(400, size.width - 640)
-    ref.current.zoom = Math.min(usableW / 28, (size.height - 250) / 22)
+    const usableW = Math.max(400, size.width - (sidePanels ? 640 : 120))
+    ref.current.zoom = Math.min(usableW / 28, (size.height - (sidePanels ? 250 : 200)) / 22)
     ref.current.updateProjectionMatrix()
-  }, [size])
+  }, [size, sidePanels])
   return <OrthographicCamera ref={ref} makeDefault position={[11, 24, 28]} near={-100} far={200} />
 }
 
@@ -48,7 +51,7 @@ function Label({
     <SceneHtml position={position} center zIndexRange={[5, 0]} style={{ pointerEvents: 'none' }}>
       <div
         style={{ color, fontSize: size, letterSpacing: '0.12em' }}
-        className="font-mono font-semibold whitespace-nowrap uppercase drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+        className="rounded bg-slate-950/55 px-1.5 py-0.5 font-mono font-semibold whitespace-nowrap uppercase"
       >
         {children}
       </div>
@@ -85,31 +88,45 @@ function BarnShell() {
 
   return (
     <group>
-      <mesh rotation-x={-Math.PI / 2} position={[0, -0.02, 0]} receiveShadow>
-        <planeGeometry args={[90, 60]} />
-        <meshStandardMaterial color="#04060a" />
+      <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 0]}>
+        <planeGeometry args={[GRID_W + 3, GRID_H + 3]} />
+        <meshLambertMaterial color="#7a6a55" />
       </mesh>
       <mesh rotation-x={-Math.PI / 2} position={[0, 0, 0]}>
         <planeGeometry args={[GRID_W, GRID_H]} />
-        <meshStandardMaterial color="#0b111a" />
+        <meshLambertMaterial color="#5c544a" />
       </mesh>
       <lineSegments geometry={grid}>
-        <lineBasicMaterial color="#1e293b" transparent opacity={0.45} />
+        <lineBasicMaterial color="#2b2620" transparent opacity={0.35} />
       </lineSegments>
       <lineSegments geometry={roof}>
-        <lineBasicMaterial color="#38bdf8" transparent opacity={0.16} />
+        <lineBasicMaterial color="#e2e8f0" transparent opacity={0.28} />
       </lineSegments>
-      {/* North + south walls (translucent) */}
+      {/* Wooden knee walls + translucent curtain above */}
       {[-HALF_H, HALF_H].map((z) => (
-        <mesh key={z} position={[0, WALL_H / 2, z]}>
-          <boxGeometry args={[GRID_W, WALL_H, 0.06]} />
-          <meshStandardMaterial color="#1e293b" transparent opacity={z < 0 ? 0.35 : 0.08} />
-        </mesh>
+        <group key={z}>
+          <mesh position={[0, 0.45, z]}>
+            <boxGeometry args={[GRID_W, 0.9, 0.12]} />
+            <meshLambertMaterial color="#7b5636" />
+          </mesh>
+          <mesh position={[0, 0.9 + (WALL_H - 0.9) / 2, z]}>
+            <boxGeometry args={[GRID_W, WALL_H - 0.9, 0.04]} />
+            <meshLambertMaterial color="#cbd5e1" transparent opacity={z < 0 ? 0.28 : 0.06} depthWrite={false} />
+          </mesh>
+        </group>
       ))}
       <mesh position={[HALF_W + 0.05, WALL_H / 2, 0]}>
-        <boxGeometry args={[0.08, WALL_H, GRID_H]} />
-        <meshStandardMaterial color="#1e293b" transparent opacity={0.25} />
+        <boxGeometry args={[0.1, WALL_H, GRID_H]} />
+        <meshLambertMaterial color="#8a6a4a" transparent opacity={0.35} depthWrite={false} />
       </mesh>
+      {Array.from({ length: 7 }, (_, k) => -HALF_W + k * 4).flatMap((x) =>
+        [-HALF_H, HALF_H].map((z) => (
+          <mesh key={`${x}${z}`} position={[x, WALL_H / 2, z]}>
+            <boxGeometry args={[0.16, WALL_H, 0.16]} />
+            <meshLambertMaterial color="#6b4a2e" />
+          </mesh>
+        )),
+      )}
     </group>
   )
 }
@@ -119,15 +136,15 @@ function FeedAlley() {
     <group>
       <mesh rotation-x={-Math.PI / 2} position={[wx(9), 0.012, wz(6)]}>
         <planeGeometry args={[16, 2]} />
-        <meshStandardMaterial color="#141b26" />
+        <meshLambertMaterial color="#8d8a84" />
       </mesh>
       {[wz(5) + 0.08, wz(7) - 0.08].map((z) => (
         <mesh key={z} position={[wx(9), 0.12, z]}>
           <boxGeometry args={[16, 0.24, 0.16]} />
-          <meshStandardMaterial color="#5b4630" />
+          <meshLambertMaterial color="#6e4f33" />
         </mesh>
       ))}
-      <Label position={[wx(3), 0.3, wz(6)]} color="#64748b" size={10}>
+      <Label position={[wx(3), 0.3, wz(6)]} color="#e2e8f0" size={10}>
         Feed Alley
       </Label>
     </group>
@@ -281,7 +298,7 @@ function FanBanks() {
           strength === 0 ? 'failed' : portable ? 'portable' : strength > 1.01 ? 'boosted' : 'normal'
         return <Fan key={f.id} id={f.id} z={wz((f.j0 + f.j1 + 1) / 2)} strength={strength} status={status} />
       })}
-      <Label position={[HALF_W + 1.7, 0.1, HALF_H + 0.9]} color="#64748b" size={10}>
+      <Label position={[HALF_W + 1.7, 0.1, HALF_H + 0.9]} color="#cbd5e1" size={10}>
         Exhaust (East)
       </Label>
     </group>
@@ -337,46 +354,63 @@ function WestInlets() {
   )
 }
 
-export default function BarnScene() {
+// Keep these stable: Grass/Trees rebuild their instanced meshes when props change identity.
+const BARN_FOOTPRINT = { x0: -HALF_W - 3, x1: HALF_W + 4, z0: -HALF_H - 3, z1: HALF_H + 4.5 }
+const LAMPS: [number, number, number][] = [
+  [-8, RIDGE_H - 0.5, 0],
+  [0, RIDGE_H - 0.5, 0],
+  [8, RIDGE_H - 0.5, 0],
+]
+
+function SceneLighting() {
+  const hour = useSim((s) => s.hour)
+  const mode = useSim((s) => s.lighting)
+  return <DayNightRig daylight={daylightFor(hour, mode)} hourOfDay={mode === 'day' ? 13 : mode === 'night' ? 1 : hour % 24} lamps={LAMPS} />
+}
+
+function Effects() {
+  const hour = useSim((s) => s.hour)
+  const mode = useSim((s) => s.lighting)
+  const d = daylightFor(hour, mode)
+  return (
+    <EffectComposer multisampling={4}>
+      <Bloom mipmapBlur luminanceThreshold={0.95 + 1.6 * d} luminanceSmoothing={0.25} intensity={0.85} />
+      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+      <Vignette eskil={false} offset={0.3} darkness={0.45} />
+    </EffectComposer>
+  )
+}
+
+export default function BarnScene({ sidePanels = true }: { sidePanels?: boolean }) {
   const selectPen = useSim((s) => s.selectPen)
   const [overlayEl, setOverlayEl] = useState<HTMLDivElement | null>(null)
   const overlay = useMemo(() => (overlayEl ? { current: overlayEl } : undefined), [overlayEl])
   return (
     <div className="relative h-full w-full">
       {overlay && (
-    <Canvas dpr={[1, 2]} gl={{ antialias: true }} onPointerMissed={() => selectPen(null)}>
-      <color attach="background" args={['#05070b']} />
-      <IsoCamera />
-      <OrbitControls
-        makeDefault
-        target={[0, 0, 0]}
-        enableDamping
-        minPolarAngle={0.35}
-        maxPolarAngle={1.25}
-        minZoom={12}
-        maxZoom={120}
-      />
-      <ambientLight intensity={0.55} />
-      <hemisphereLight args={['#94a3b8', '#0b1220', 0.6]} />
-      <directionalLight position={[8, 18, 10]} intensity={1.4} />
-      <OverlayContext.Provider value={overlay}>
-        <BarnShell />
-        <HeatmapFloor />
-        <FeedAlley />
-        <PenBlocks />
-        <WestInlets />
-        <FanBanks />
-        <AirflowParticles />
-        <CattleInstances />
-        <PenOverlays />
-      </OverlayContext.Provider>
-      <EffectComposer multisampling={4}>
-        <Bloom mipmapBlur luminanceThreshold={1} luminanceSmoothing={0.2} intensity={0.9} />
-        <Vignette eskil={false} offset={0.25} darkness={0.6} />
-      </EffectComposer>
-    </Canvas>
+        <Canvas dpr={[1, 2]} gl={{ antialias: true }} onPointerMissed={() => selectPen(null)}>
+          <IsoCamera sidePanels={sidePanels} />
+          <OrbitControls makeDefault target={[0, 0, 0]} enableDamping minPolarAngle={0.35} maxPolarAngle={1.25} minZoom={10} maxZoom={120} />
+          <SceneLighting />
+          <Ground />
+          <Grass exclude={BARN_FOOTPRINT} />
+          <Trees exclude={BARN_FOOTPRINT} />
+          <OverlayContext.Provider value={overlay}>
+            <BarnShell />
+            <HeatmapFloor />
+            <FeedAlley />
+            <PenBlocks />
+            <WestInlets />
+            <FanBanks />
+            <AirflowParticles />
+            <CattleInstances />
+            <PenOverlays />
+          </OverlayContext.Provider>
+          <Effects />
+        </Canvas>
       )}
-      <div ref={setOverlayEl} className="pointer-events-none absolute inset-0 overflow-hidden" />
+      {/* z-0 makes this its own stacking context so 3D labels stay beneath the HUD panels. */}
+      <div ref={setOverlayEl} className="pointer-events-none absolute inset-0 z-0 overflow-hidden" />
     </div>
   )
 }

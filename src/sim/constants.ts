@@ -11,8 +11,8 @@ export const CELL_VOLUME_M3 = CELL_M * CELL_M * CEILING_M
 export const FACE_AREA_M2 = CELL_M * CEILING_M
 
 export const HOURS = 168
-export const HERD_SIZE = 320
-export const COWS_PER_PEN = 40
+export const HERD_SIZE = 160
+export const COWS_PER_PEN = 20
 export const HEAD_VALUE_USD = 1800
 export const HERD_VALUE_USD = HERD_SIZE * HEAD_VALUE_USD
 
@@ -115,16 +115,16 @@ export const HEAT = {
 
 export const AMMONIA = {
   /** NH3 emission per cow at 20 C, expressed as ppm*m^3/s. */
-  perCowPpmM3s: 4.5,
+  perCowPpmM3s: 7,
   tempCoefficient: 1.07,
   backgroundPpm: 2,
 }
 
 export const BRD = {
   /** Airborne transmission coefficient (per hour per unit aerosol concentration). */
-  betaAir: 0.05,
+  betaAir: 0.12,
   /** Nose-to-nose contact transmission (per hour per shedding pen-mate fraction). */
-  betaContact: 0.025,
+  betaContact: 0.03,
   bunchContactMultiplier: 2.8,
   bunchTHIThreshold: 76,
   bunchTHIRange: 8,

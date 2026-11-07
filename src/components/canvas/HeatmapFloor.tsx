@@ -78,7 +78,7 @@ export default function HeatmapFloor() {
   return (
     <mesh rotation-x={-Math.PI / 2} position={[0, 0.01, 0]} renderOrder={1}>
       <planeGeometry args={[GRID_W, GRID_H]} />
-      <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
+      <meshBasicMaterial map={tex} transparent opacity={0.78} depthWrite={false} toneMapped={false} />
     </mesh>
   )
 }

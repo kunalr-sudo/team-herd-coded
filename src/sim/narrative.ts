@@ -85,13 +85,13 @@ export function buildStory(
     const T = fr.weather.tempC.toFixed(0)
     if (fr.weather.heatwave > 0.3)
       return {
-        headline: `${h} A heatwave is building outside (${T}°C), but all 3 fans are running and 320 cattle look comfortable.${
+        headline: `${h} A heatwave is building outside (${T}°C), but all 3 fans are running and the herd looks comfortable.${
           xray && t.quiet > 0 ? ' X-Ray: a newly arrived calf in Pen 3 is already quietly incubating BRD.' : ''
         }`,
         tone: xray && t.quiet > 0 ? 'warn' : 'calm',
       }
     return {
-      headline: `${h} Normal operations — all 3 exhaust fans running, fresh air flowing, 320 cattle calm.`,
+      headline: `${h} Normal operations — all 3 exhaust fans running, fresh air flowing, the herd is calm.`,
       tone: 'calm',
     }
   }

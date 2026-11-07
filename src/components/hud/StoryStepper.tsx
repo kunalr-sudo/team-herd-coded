@@ -16,7 +16,7 @@ const PRESETS: { id: PresetId; title: string; sub: string }[] = [
   { id: 4, title: '4. BarnTwin Smart Fix', sub: 'Isolate · ventilate · cool · target' },
 ]
 
-function XRayToggle() {
+export function XRayToggle() {
   const xray = useSim((s) => s.xray)
   const setXray = useSim((s) => s.setXray)
   return (
@@ -43,36 +43,49 @@ function XRayToggle() {
   )
 }
 
-export default function StoryStepper() {
+/** One-sentence "What's happening now" narration of the current hour. */
+export function StoryBanner({ className = '' }: { className?: string }) {
   const bundle = useSim((s) => s.bundle)
   const kind = useSim((s) => s.planKind)
   const hour = useSim((s) => s.hour)
   const xray = useSim((s) => s.xray)
   const fault = useSim((s) => s.crisis.fanBFault)
-  const preset = useSim((s) => s.preset)
-  const applyPreset = useSim((s) => s.applyPreset)
   const story = buildStory(bundle, kind, hour, xray, fault)
   const tone = TONE[story.tone]
+  return (
+    <div className={`panel flex items-center gap-3 border px-4 py-2.5 ${tone.border} ${className}`}>
+      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${tone.dot}`} />
+      <div className="min-w-0">
+        <div className={`text-[10px] font-bold uppercase tracking-[0.18em] ${tone.label}`}>What&apos;s happening now</div>
+        <div className="text-[15px] font-medium leading-snug text-slate-50">{story.headline}</div>
+      </div>
+    </div>
+  )
+}
+
+export default function StoryStepper() {
+  const preset = useSim((s) => s.preset)
+  const applyPreset = useSim((s) => s.applyPreset)
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-center gap-2 px-4 pt-3">
       <div className="pointer-events-auto flex w-full max-w-[1180px] items-center gap-3">
-        <div className="panel flex shrink-0 items-center gap-2 px-3 py-2">
-          <div className="h-7 w-7 rounded-md bg-gradient-to-br from-cyan-400 to-emerald-500 grid place-items-center text-slate-950 font-black text-sm">
-            B
-          </div>
-          <div className="leading-tight">
-            <div className="text-[13px] font-bold tracking-wide text-slate-100">BarnTwin</div>
-            <div className="text-[10px] text-slate-400">320-head cattle barn · digital twin</div>
-          </div>
+        <div className="panel flex shrink-0 flex-col gap-1 px-3 py-2">
+          <a href="#/" className="flex items-center gap-2" title="Back to the BarnTwin home page">
+            <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-cyan-400 to-emerald-500 text-sm font-black text-slate-950">B</div>
+            <div className="leading-tight">
+              <div className="text-[13px] font-bold tracking-wide text-slate-100">BarnTwin</div>
+              <div className="text-[10px] text-slate-400">Predicts hidden disease from barn air</div>
+            </div>
+          </a>
+          <nav className="flex gap-2 text-[10.5px] font-semibold">
+            <a href="#/" className="text-slate-400 hover:text-white">Home</a>
+            <a href="#/simulate" className="text-slate-400 hover:text-white">New scenario</a>
+            <span className="text-cyan-300">Expert view</span>
+            <a href="#/pasture" className="text-slate-400 hover:text-white">Pasture 🐄</a>
+          </nav>
         </div>
-        <div className={`panel flex flex-1 items-center gap-3 px-4 py-2.5 border ${tone.border}`}>
-          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${tone.dot}`} />
-          <div className="min-w-0">
-            <div className={`text-[10px] font-bold uppercase tracking-[0.18em] ${tone.label}`}>What&apos;s happening now</div>
-            <div className="text-[15px] font-medium leading-snug text-slate-50">{story.headline}</div>
-          </div>
-        </div>
+        <StoryBanner className="flex-1" />
       </div>
       <div className="pointer-events-auto flex w-full max-w-[1180px] items-center gap-2">
         {PRESETS.map((p) => (

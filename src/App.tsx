@@ -1,21 +1,15 @@
-import BarnScene from './components/canvas/BarnScene'
-import CowLegend from './components/hud/CowLegend'
-import ImpactDashboard from './components/hud/ImpactDashboard'
-import InterventionDeck from './components/hud/InterventionDeck'
-import StoryStepper from './components/hud/StoryStepper'
-import TimelineBar from './components/hud/TimelineBar'
+import LabPage from './pages/LabPage'
+import LandingPage from './pages/LandingPage'
+import PasturePage from './pages/PasturePage'
+import RunPage from './pages/RunPage'
+import SetupPage from './pages/SetupPage'
+import { useRoute } from './router'
 
 export default function App() {
-  return (
-    <div className="relative h-full w-full select-none font-sans">
-      <div className="absolute inset-0">
-        <BarnScene />
-      </div>
-      <StoryStepper />
-      <InterventionDeck />
-      <ImpactDashboard />
-      <CowLegend />
-      <TimelineBar />
-    </div>
-  )
+  const route = useRoute()
+  if (route === 'simulate') return <SetupPage />
+  if (route === 'run') return <RunPage />
+  if (route === 'lab') return <LabPage />
+  if (route === 'pasture') return <PasturePage />
+  return <LandingPage />
 }

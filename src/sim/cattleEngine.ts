@@ -1,4 +1,4 @@
-// Coupled 320-cow BRD agent engine + counterfactual calculator.
+// Coupled 160-cow BRD agent engine + counterfactual calculator.
 //
 // Every cow receives fixed, pre-drawn random numbers (infection threshold,
 // incubation length, clinical/mortality/chronic draws). All trajectories reuse the
@@ -177,8 +177,8 @@ interface HerdDraws {
 }
 
 export const INDEX_CASES = [
-  { cow: 2 * COWS_PER_PEN + 17, onsetHour: TIMELINE.crisisHour, incubation: 40 },
-  { cow: 2 * COWS_PER_PEN + 6, onsetHour: 29, incubation: 44 },
+  { cow: 2 * COWS_PER_PEN + 7, onsetHour: TIMELINE.crisisHour, incubation: 40 },
+  { cow: 2 * COWS_PER_PEN + 13, onsetHour: 29, incubation: 44 },
 ]
 
 export const HERD: HerdDraws = (() => {
@@ -674,8 +674,8 @@ export function classifyPlan(plan: InterventionConfig): PlanKind {
 // ---------------------------------------------------------------------------
 // 2D cow coordinates (grid units) — spread when cool, bunched when hot, hospital when isolated.
 
-const SPREAD_COLS = 8
-const SPREAD_ROWS = 5
+const SPREAD_COLS = 5
+const SPREAD_ROWS = 4
 
 function sunflower(k: number, spacing: number) {
   const golden = Math.PI * (3 - Math.sqrt(5))
@@ -719,7 +719,7 @@ export function cowTargets(frame: HourFrame, out: Float32Array) {
     const cluster = k % 2
     const cx = pen.i0 + (cluster === 0 ? 1.15 : 2.85)
     const cz = pen.j0 + (pen.row === 'north' ? 1.6 + cluster * 1.5 : 3.4 - cluster * 1.5)
-    const sf = sunflower(Math.floor(k / 2), 0.34)
+    const sf = sunflower(Math.floor(k / 2), 0.4)
     const bx = cx + sf.x
     const bz = cz + sf.z * 0.95
     out[o] = sx + (bx - sx) * b
