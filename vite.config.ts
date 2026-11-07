@@ -5,6 +5,6 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  // three.js + drei + postprocessing dominate the single-screen bundle (~365 kB gzip).
+  // Pages are lazy-loaded; the shared three.js + drei chunk is ~960 kB (~256 kB gzip).
   build: { chunkSizeWarningLimit: 1500 },
 })

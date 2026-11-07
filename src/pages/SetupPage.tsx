@@ -1,80 +1,134 @@
-import { ArrowLeft, ArrowRight, BrainCircuit, Check, Droplets, Fan, Flame, Hospital, Pencil, Pill, Play, Sparkles, Wand2, Wind } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { AnimatePresence, MotionConfig, motion } from 'motion/react'
+import { ArrowUp, Check, ChevronDown, ChevronLeft, Dna, Droplets, Fan, Flame, Hospital, Pill, Play, SlidersHorizontal, Sparkles, Timer, Wind, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import BarnScene from '../components/canvas/BarnScene'
-import { usd } from '../sim/advisor'
-import { NO_INTERVENTION, type AbxStrategy, type InterventionConfig, type ScenarioSummary } from '../sim/cattleEngine'
-import { HERD_SIZE, TIMELINE, hourLabel } from '../sim/constants'
+import { AnimatedNumber, IconTile, Row, Segmented, Switch } from '../components/ui/controls'
+import { SPRING } from '../components/ui/spring'
+import { NO_INTERVENTION, type AbxStrategy, type InterventionConfig } from '../sim/cattleEngine'
+import { TIMELINE, hourLabel } from '../sim/constants'
 import { penList } from '../sim/narrative'
-import { EXAMPLE_PROMPTS, HEAT_MAX, HEAT_MIN, translateScenario, type Interpretation } from '../sim/scenarioParser'
+import { EXAMPLE_PROMPTS, HEAT_MAX, HEAT_MIN, translateScenario } from '../sim/scenarioParser'
 import { useSim } from '../store/useSimulationStore'
 
 type Step = 'crisis' | 'response'
-type CrisisMode = 'ai' | 'manual'
 type Choice = 'smart' | 'none' | 'own'
 
-function Outcome({ s, base, highlight }: { s: ScenarioSummary; base?: ScenarioSummary; highlight?: boolean }) {
-  const saved = base ? base.cost.total - s.cost.total : null
-  return (
-    <div className={`grid grid-cols-3 gap-2 rounded-lg px-3 py-2 ${highlight ? 'bg-emerald-500/10' : 'bg-slate-900/70'}`}>
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Sick</div>
-        <div className="text-[18px] font-extrabold text-slate-100">{s.clinicalCases}</div>
-      </div>
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Deaths</div>
-        <div className="text-[18px] font-extrabold text-slate-100">{s.deaths}</div>
-      </div>
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">{saved === null ? 'Herd loss' : saved >= 0 ? 'Saved' : 'Extra loss'}</div>
-        <div className={`text-[18px] font-extrabold ${saved === null ? 'text-red-300' : saved >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-          {saved === null ? usd(s.cost.total) : usd(Math.abs(saved))}
-        </div>
-      </div>
-    </div>
-  )
+// Remembers the response choice while moving back and forth between steps.
+let rememberedChoice: Choice | null = null
+
+const money = (v: number) => `$${Math.round(Math.abs(v)).toLocaleString('en-US')}`
+const heatWord = (t: number) => (t >= 40 ? 'Extreme' : t >= 37 ? 'Heatwave' : t >= 34 ? 'Hot' : 'Warm')
+
+/** Steps slide in the direction of travel and return the way they came. */
+const stepVariants = {
+  enter: (dir: number) => ({ x: dir * 48, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: number) => ({ x: dir * -48, opacity: 0 }),
 }
 
-function Stepper({ step }: { step: Step }) {
-  const items: [Step | 'run', string][] = [
-    ['crisis', 'Crisis'],
-    ['response', 'Response'],
-    ['run', 'Run'],
-  ]
-  const idx = step === 'crisis' ? 0 : 1
+function PageDots({ step }: { step: Step }) {
   return (
-    <div className="flex items-center gap-2">
-      {items.map(([id, label], k) => (
-        <div key={id} className="flex items-center gap-2">
-          <div
-            className={`grid h-7 w-7 place-items-center rounded-full text-[12px] font-bold ${
-              k < idx ? 'bg-emerald-500 text-slate-950' : k === idx ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-400'
-            }`}
-          >
-            {k < idx ? <Check size={14} /> : k + 1}
-          </div>
-          <span className={`text-[13px] font-semibold ${k === idx ? 'text-white' : 'text-slate-400'}`}>{label}</span>
-          {k < items.length - 1 && <div className="mx-1 h-px w-8 bg-slate-700" />}
-        </div>
+    <div className="flex items-center gap-1.5" aria-label={`Step ${step === 'crisis' ? 1 : 2} of 2`}>
+      {(['crisis', 'response'] as Step[]).map((s) => (
+        <motion.span key={s} className="h-1.5 rounded-full bg-white" animate={{ width: s === step ? 18 : 6, opacity: s === step ? 1 : 0.35 }} transition={SPRING} />
       ))}
     </div>
   )
 }
 
-function ModeTab({ active, onClick, icon, title, sub }: { active: boolean; onClick: () => void; icon: ReactNode; title: string; sub: string }) {
+function Header({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle: string }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex flex-1 items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
-        active ? 'border-cyan-400 bg-cyan-500/10' : 'border-slate-700 bg-slate-900/50 hover:border-slate-500'
-      }`}
-    >
-      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${active ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-300'}`}>{icon}</div>
-      <div>
-        <div className="text-[14px] font-bold text-slate-100">{title}</div>
-        <div className="text-[12px] text-slate-400">{sub}</div>
-      </div>
-    </button>
+    <div className="mb-5">
+      <div className="text-[13px] font-semibold text-cyan-300">{eyebrow}</div>
+      <h1 className="display-title mt-1 text-[34px] font-bold text-white">{title}</h1>
+      <p className="mt-1.5 text-[15px] leading-relaxed text-slate-400">{subtitle}</p>
+    </div>
+  )
+}
+
+/** Spotlight-style field. The interpretation previews live; Return applies it to the controls below. */
+function SmartTranslate() {
+  const setCrisis = useSim((s) => s.setCrisis)
+  const [text, setText] = useState('')
+  const [applied, setApplied] = useState<string | null>(null)
+  const preview = useMemo(() => (text.trim().length > 3 ? translateScenario(text) : null), [text])
+
+  const apply = (value = text) => {
+    if (!value.trim()) return
+    const r = translateScenario(value)
+    setCrisis(r.crisis)
+    setApplied(value)
+  }
+  const summary = preview && `${preview.crisis.heatwaveTemp}°C ${heatWord(preview.crisis.heatwaveTemp).toLowerCase()} · ${preview.crisis.fanBFault ? `Fan B fails ${hourLabel(TIMELINE.crisisHour)}` : 'all fans running'}`
+
+  return (
+    <div className="mb-4">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          apply()
+        }}
+        className="flex items-center gap-2.5 rounded-[14px] bg-white/[0.08] px-3.5 py-2.5 ring-1 ring-transparent transition-shadow focus-within:ring-cyan-400/60"
+      >
+        <Sparkles size={18} className="shrink-0 text-cyan-300" />
+        <input
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value)
+            setApplied(null)
+          }}
+          placeholder="Describe it — e.g. “104°F and the middle fan breaks”"
+          aria-label="Describe the crisis in your own words"
+          className="min-w-0 flex-1 bg-transparent text-[15px] text-white placeholder:text-slate-500 focus:outline-none"
+        />
+        {text && (
+          <button type="button" onClick={() => setText('')} className="text-slate-500 hover:text-white" aria-label="Clear">
+            <X size={16} />
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={!text.trim()}
+          aria-label="Apply description"
+          className="press grid h-7 w-7 shrink-0 place-items-center rounded-full bg-cyan-400 text-slate-950 disabled:bg-white/10 disabled:text-slate-500"
+        >
+          <ArrowUp size={16} strokeWidth={2.6} />
+        </button>
+      </form>
+      <AnimatePresence initial={false} mode="wait">
+        {preview ? (
+          <motion.div key="preview" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={SPRING} className="mt-2 px-1 text-[13px]">
+            <span className={applied === text ? 'text-emerald-300' : 'text-slate-300'}>
+              {applied === text ? <Check size={13} className="mr-1 inline -translate-y-px" /> : 'Reads as: '}
+              {summary}
+            </span>
+            {applied !== text && <span className="text-slate-500"> — press Return to use</span>}
+            {preview.notes.map((n) => (
+              <div key={n} className="text-amber-200/80">
+                {n}
+              </div>
+            ))}
+          </motion.div>
+        ) : (
+          <motion.div key="hints" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mt-2 flex flex-wrap gap-x-3 gap-y-1 px-1 text-[13px] text-slate-500">
+            <span>Try:</span>
+            {EXAMPLE_PROMPTS.slice(1).map((p) => (
+              <button
+                type="button"
+                key={p}
+                onClick={() => {
+                  setText(p)
+                  apply(p)
+                }}
+                className="text-slate-300 underline decoration-white/20 underline-offset-4 hover:text-white hover:decoration-white/60"
+              >
+                {p.replace(/[.]$/, '')}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 
@@ -82,210 +136,96 @@ function CrisisStep({ onNext }: { onNext: () => void }) {
   const crisis = useSim((s) => s.crisis)
   const setCrisis = useSim((s) => s.setCrisis)
   const base = useSim((s) => s.bundle.doNothing.summary)
-  const [mode, setMode] = useState<CrisisMode>('ai')
-  const [text, setText] = useState('')
-  const [result, setResult] = useState<Interpretation | null>(null)
-
-  const translate = () => {
-    const r = translateScenario(text || EXAMPLE_PROMPTS[0])
-    if (!text) setText(EXAMPLE_PROMPTS[0])
-    setResult(r)
-    setCrisis(r.crisis)
-  }
+  const fill = ((crisis.heatwaveTemp - HEAT_MIN) / (HEAT_MAX - HEAT_MIN)) * 100
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-[26px] font-extrabold text-white">What goes wrong in the barn?</h2>
-        <p className="text-[14px] text-slate-400">Describe a crisis in your own words, or set it up yourself. A {HERD_SIZE}-head barn with 8 pens is ready.</p>
-      </div>
-      <div className="flex gap-3">
-        <ModeTab active={mode === 'ai'} onClick={() => setMode('ai')} icon={<Wand2 size={18} />} title="Describe it — AI translates" sub="Type what happens, BarnTwin sets it up" />
-        <ModeTab active={mode === 'manual'} onClick={() => setMode('manual')} icon={<Pencil size={18} />} title="Set it up manually" sub="Pick the heat and the fault yourself" />
-      </div>
+    <>
+      <Header eyebrow="Step 1 of 2" title="What goes wrong this week?" subtitle="Type it in a sentence, or set it directly below — they stay in sync." />
+      <SmartTranslate />
 
-      {mode === 'ai' ? (
-        <div className="space-y-2">
-          <textarea
-            value={text}
-            onChange={(e) => {
-              setText(e.target.value)
-              setResult(null)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) translate()
-            }}
-            rows={3}
-            placeholder={`e.g. "${EXAMPLE_PROMPTS[0]}"`}
-            className="w-full resize-none rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2.5 text-[14px] text-slate-100 placeholder:text-slate-500 focus:border-cyan-400 focus:outline-none"
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            {EXAMPLE_PROMPTS.map((p) => (
-              <button
-                type="button"
-                key={p}
-                onClick={() => {
-                  setText(p)
-                  setResult(null)
-                }}
-                className="max-w-[260px] truncate rounded-full border border-slate-700 px-2.5 py-1 text-[11.5px] text-slate-300 hover:border-slate-500"
-                title={p}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={translate}
-            className="flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-2 text-[14px] font-bold text-slate-950 hover:bg-cyan-300"
-          >
-            <Sparkles size={16} /> Translate with BarnTwin AI
-          </button>
-          {result && (
-            <div className="rounded-xl border border-cyan-500/40 bg-cyan-500/5 p-3">
-              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-300">
-                <BrainCircuit size={13} /> BarnTwin understood
-              </div>
-              <ul className="space-y-0.5 text-[13.5px] text-slate-100">
-                {result.understood.map((u) => (
-                  <li key={u} className="flex gap-1.5">
-                    <Check size={15} className="mt-0.5 shrink-0 text-emerald-400" /> {u}
-                  </li>
-                ))}
-              </ul>
-              {result.notes.length > 0 && (
-                <ul className="mt-1.5 space-y-0.5 text-[12px] text-amber-200/90">
-                  {result.notes.map((n) => (
-                    <li key={n}>• {n}</li>
-                  ))}
-                </ul>
-              )}
-              <button type="button" onClick={() => setMode('manual')} className="mt-1.5 text-[12px] font-semibold text-cyan-300 hover:underline">
-                Not quite right? Adjust it manually →
-              </button>
-            </div>
-          )}
-          <div className="text-[11px] text-slate-500">Runs locally in your browser — your text is never sent anywhere.</div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-3">
-            <div className="flex items-center justify-between text-[14px] font-semibold text-slate-100">
-              <span className="flex items-center gap-1.5">
-                <Flame size={16} className="text-orange-300" /> Heatwave peak
-              </span>
-              <span className="font-mono text-orange-300">{crisis.heatwaveTemp}°C</span>
-            </div>
-            <input
-              type="range"
-              min={HEAT_MIN}
-              max={HEAT_MAX}
-              value={crisis.heatwaveTemp}
-              onChange={(e) => setCrisis({ heatwaveTemp: Number(e.target.value) })}
-              className="mt-2 w-full accent-orange-400"
-            />
-            <div className="flex justify-between text-[11px] text-slate-500">
-              <span>{HEAT_MIN}°C warm</span>
-              <span>{HEAT_MAX}°C extreme</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setCrisis({ fanBFault: !crisis.fanBFault })}
-            className={`flex items-center gap-3 rounded-xl border p-3 text-left ${crisis.fanBFault ? 'border-red-500/60 bg-red-500/10' : 'border-slate-700 bg-slate-900/60'}`}
-          >
-            <Fan size={22} className={crisis.fanBFault ? 'text-red-300' : 'text-slate-500'} />
-            <div className="flex-1">
-              <div className="text-[14px] font-semibold text-slate-100">Fan B breaks down</div>
-              <div className="text-[12px] text-slate-400">
-                Centre exhaust fan stops at {hourLabel(TIMELINE.crisisHour)} (Hour {TIMELINE.crisisHour})
-              </div>
-            </div>
-            <span className={`relative h-6 w-11 shrink-0 rounded-full ${crisis.fanBFault ? 'bg-red-500' : 'bg-slate-700'}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${crisis.fanBFault ? 'left-[22px]' : 'left-0.5'}`} />
+      <div className="grouped">
+        <Row
+          icon={
+            <IconTile color="orange">
+              <Flame size={17} />
+            </IconTile>
+          }
+          title="Heatwave peak"
+          subtitle={`${heatWord(crisis.heatwaveTemp)} afternoons for about 5 days`}
+          trailing={
+            <span className="text-[22px] font-bold tracking-tight text-white">
+              <AnimatedNumber value={crisis.heatwaveTemp} />
+              °C
             </span>
-          </button>
-        </div>
-      )}
-
-      <div className="rounded-xl border border-slate-700/70 bg-slate-950/60 p-3">
-        <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">If nobody acts, over the next 7 days</div>
-        <Outcome s={base} />
+          }
+        >
+          <input
+            type="range"
+            min={HEAT_MIN}
+            max={HEAT_MAX}
+            value={crisis.heatwaveTemp}
+            onChange={(e) => setCrisis({ heatwaveTemp: Number(e.target.value) })}
+            aria-label="Heatwave peak temperature"
+            className="ios-slider"
+            style={{ ['--fill' as string]: `${fill}%`, ['--fill-bg' as string]: 'linear-gradient(90deg,#fbbf24,#f97316,#ef4444)' }}
+          />
+          <div className="mt-0.5 flex justify-between text-[12px] text-slate-500">
+            <span>Warm</span>
+            <span>Hot</span>
+            <span>Extreme</span>
+          </div>
+        </Row>
+        <Row
+          icon={
+            <IconTile color={crisis.fanBFault ? 'red' : 'slate'}>
+              <motion.span animate={crisis.fanBFault ? { rotate: 0 } : { rotate: 360 }} transition={crisis.fanBFault ? SPRING : { repeat: Infinity, duration: 1.6, ease: 'linear' }} className="grid">
+                <Fan size={17} />
+              </motion.span>
+            </IconTile>
+          }
+          title="Fan B breaks down"
+          subtitle={crisis.fanBFault ? `Centre exhaust fan stops ${hourLabel(TIMELINE.crisisHour)}` : 'All three exhaust fans keep running'}
+          trailing={<Switch on={crisis.fanBFault} onChange={(v) => setCrisis({ fanBFault: v })} label="Fan B breaks down" tone="red" />}
+          onClick={() => setCrisis({ fanBFault: !crisis.fanBFault })}
+        />
+        <Row
+          icon={
+            <IconTile color="purple">
+              <Dna size={17} />
+            </IconTile>
+          }
+          title="Two new calves carry BRD"
+          subtitle="Always included, so every response is compared fairly"
+          trailing={<span className="text-[13px] text-slate-500">Pen 3</span>}
+          divider={false}
+        />
       </div>
 
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => {
-            if (mode === 'ai' && text.trim() && !result) setCrisis(translateScenario(text).crisis)
-            onNext()
-          }}
-          className="flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-[14px] font-bold text-slate-950 hover:bg-cyan-100"
-        >
-          Next: choose a response <ArrowRight size={16} />
+      <div className="mt-5 grid grid-cols-3 divide-x divide-white/[0.08] rounded-[18px] bg-red-500/[0.07] py-3 text-center">
+        <div className="col-span-3 -mt-0.5 mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-red-200/70">If nobody acts</div>
+        {[
+          ['sick', base.clinicalCases, (v: number) => Math.round(v).toString()],
+          ['deaths', base.deaths, (v: number) => Math.round(v).toString()],
+          ['herd loss', base.cost.total, money],
+        ].map(([label, value, fmt]) => (
+          <div key={label as string}>
+            <div className="text-[24px] font-bold tracking-tight text-white">
+              <AnimatedNumber value={value as number} format={fmt as (v: number) => string} />
+            </div>
+            <div className="text-[12px] text-slate-400">{label as string}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 flex items-center justify-between">
+        <a href="#/" className="text-[15px] font-medium text-slate-400 hover:text-white">
+          Cancel
+        </a>
+        <button type="button" onClick={onNext} className="press rounded-full bg-white px-6 py-2.5 text-[15px] font-semibold text-slate-950 hover:bg-slate-100">
+          Continue
         </button>
       </div>
-    </div>
-  )
-}
-
-function ChoiceCard({
-  active,
-  onClick,
-  title,
-  badge,
-  sub,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  title: string
-  badge?: string
-  sub: string
-  children?: ReactNode
-}) {
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onClick()}
-      className={`cursor-pointer rounded-xl border p-3 transition-colors ${active ? 'border-cyan-400 bg-cyan-500/5' : 'border-slate-700 bg-slate-900/50 hover:border-slate-500'}`}
-    >
-      <div className="flex items-start gap-2.5">
-        <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${active ? 'border-cyan-400' : 'border-slate-600'}`}>
-          {active && <span className="h-2.5 w-2.5 rounded-full bg-cyan-400" />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[15px] font-bold text-slate-100">{title}</span>
-            {badge && <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10.5px] font-bold text-emerald-300">{badge}</span>}
-          </div>
-          <div className="text-[12.5px] text-slate-400">{sub}</div>
-          {children}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function MiniToggle({ on, onClick, icon, label }: { on: boolean; onClick: () => void; icon: ReactNode; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation()
-        onClick()
-      }}
-      className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[12.5px] font-semibold ${
-        on ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-100' : 'border-slate-700 text-slate-400 hover:border-slate-500'
-      }`}
-    >
-      {icon}
-      <span className="flex-1">{label}</span>
-      {on && <Check size={14} />}
-    </button>
+    </>
   )
 }
 
@@ -296,11 +236,22 @@ function ResponseStep({ onBack, onStart }: { onBack: () => void; onStart: () => 
   const setPlan = useSim((s) => s.setPlan)
   const applyRecommendation = useSim((s) => s.applyRecommendation)
   const resetPlan = useSim((s) => s.resetPlan)
-  const [choice, setChoice] = useState<Choice>(kind === 'smart' ? 'smart' : kind === 'none' ? 'none' : 'own')
+  const [choice, setChoice] = useState<Choice>(() => rememberedChoice ?? (kind === 'custom' || kind === 'naive' ? 'own' : 'smart'))
   const [own, setOwn] = useState<InterventionConfig>(kind === 'custom' || kind === 'naive' ? plan : { ...NO_INTERVENTION, isolate: true })
+
+  // First visit: pre-select (and simulate) the recommended plan.
+  useEffect(() => {
+    if (choice === 'smart' && kind !== 'smart') applyRecommendation()
+    if (choice === 'none' && kind !== 'none') resetPlan()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only sync once on mount
+  }, [])
+
   const base = bundle.doNothing.summary
+  const chosen = choice === 'none' ? base : choice === 'smart' ? bundle.smart.summary : bundle.current.summary
+  const saved = base.cost.total - chosen.cost.total
 
   const choose = (c: Choice) => {
+    rememberedChoice = c
     setChoice(c)
     if (c === 'smart') applyRecommendation()
     else if (c === 'none') resetPlan()
@@ -309,141 +260,223 @@ function ResponseStep({ onBack, onStart }: { onBack: () => void; onStart: () => 
   const updateOwn = (patch: Partial<InterventionConfig>) => {
     const next = { ...own, ...patch }
     setOwn(next)
-    setChoice('own')
     setPlan(next)
   }
-  const abx: { id: AbxStrategy; label: string }[] = [
-    { id: 'reactive', label: 'Only sick cows' },
-    { id: 'targeted', label: 'Exposed pens' },
-    { id: 'blanket', label: 'Whole barn' },
-  ]
+  const check = (c: Choice) => (
+    <motion.span initial={false} animate={{ scale: choice === c ? 1 : 0.6, opacity: choice === c ? 1 : 0 }} transition={SPRING} className="text-cyan-300">
+      <Check size={20} strokeWidth={2.8} />
+    </motion.span>
+  )
+  const actFill = ((own.actionHour - TIMELINE.crisisHour) / (96 - TIMELINE.crisisHour)) * 100
 
   return (
-    <div className="space-y-3">
-      <div>
-        <h2 className="text-[26px] font-extrabold text-white">How do you want to respond?</h2>
-        <p className="text-[14px] text-slate-400">Each option is simulated for the full week as you choose — the numbers are the model&apos;s projection.</p>
+    <>
+      <Header eyebrow="Step 2 of 2" title="How will you respond?" subtitle="Each choice is simulated across the whole week — pick one to see what it changes." />
+
+      <div className="grouped">
+        <Row
+          icon={
+            <IconTile color="green">
+              <Sparkles size={17} />
+            </IconTile>
+          }
+          title={
+            <span className="flex items-center gap-2">
+              BarnTwin plan
+              <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">Recommended</span>
+            </span>
+          }
+          subtitle={`Isolate the sick, fix the airflow, cool, and treat only ${penList(bundle.smart.targetedPens)}`}
+          trailing={check('smart')}
+          onClick={() => choose('smart')}
+        />
+        <Row
+          icon={
+            <IconTile color="slate">
+              <Timer size={17} />
+            </IconTile>
+          }
+          title="Do nothing"
+          subtitle="Wait, and treat cows only once they look sick"
+          trailing={check('none')}
+          onClick={() => choose('none')}
+        />
+        <Row
+          icon={
+            <IconTile color="cyan">
+              <SlidersHorizontal size={17} />
+            </IconTile>
+          }
+          title="Customize"
+          subtitle="Choose your own actions and timing"
+          trailing={
+            <span className="flex items-center gap-2">
+              {check('own')}
+              <motion.span animate={{ rotate: choice === 'own' ? 180 : 0 }} transition={SPRING} className="text-slate-500">
+                <ChevronDown size={18} />
+              </motion.span>
+            </span>
+          }
+          onClick={() => choose('own')}
+          divider={false}
+        />
       </div>
 
-      <ChoiceCard
-        active={choice === 'smart'}
-        onClick={() => choose('smart')}
-        title="Use the BarnTwin AI recommendation"
-        badge="Recommended"
-        sub={`At Hour ${plan.actionHour}: isolate sick calves · rebalance airflow · fans +25% & misters · treat only ${penList(bundle.smart.targetedPens)}`}
-      >
-        <div className="mt-2">
-          <Outcome s={bundle.smart.summary} base={base} highlight={choice === 'smart'} />
-        </div>
-      </ChoiceCard>
-
-      <ChoiceCard active={choice === 'none'} onClick={() => choose('none')} title="No intervention" sub="See what happens when the farmer only treats cows once they look sick">
-        <div className="mt-2">
-          <Outcome s={base} />
-        </div>
-      </ChoiceCard>
-
-      <ChoiceCard active={choice === 'own'} onClick={() => choose('own')} title="Choose my own interventions" sub="Pick what to do and when — compare it against BarnTwin">
+      <AnimatePresence initial={false}>
         {choice === 'own' && (
-          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
-            <div className="grid grid-cols-2 gap-1.5">
-              <MiniToggle on={own.isolate} onClick={() => updateOwn({ isolate: !own.isolate })} icon={<Hospital size={15} />} label="Isolate sick cows" />
-              <MiniToggle on={own.boostVent} onClick={() => updateOwn({ boostVent: !own.boostVent })} icon={<Wind size={15} />} label="Fans +25%" />
-              <MiniToggle on={own.rebalance} onClick={() => updateOwn({ rebalance: !own.rebalance })} icon={<Fan size={15} />} label="Rebalance airflow" />
-              <MiniToggle on={own.misters} onClick={() => updateOwn({ misters: !own.misters })} icon={<Droplets size={15} />} label="Cooling misters" />
+          <motion.div key="custom" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={SPRING} className="overflow-hidden">
+            <div className="grouped mt-3">
+              {(
+                [
+                  ['isolate', 'Isolate sick cows', 'Move them to the downwind Hospital Pen', Hospital, 'red'],
+                  ['boostVent', 'Boost fans +25%', 'Run the working fans harder', Wind, 'blue'],
+                  ['rebalance', 'Rebalance airflow', 'Close Pen 3 baffles, add a portable fan', Fan, 'teal'],
+                  ['misters', 'Cooling misters', 'Evaporative cooling at the inlets', Droplets, 'cyan'],
+                ] as const
+              ).map(([key, title, sub, Icon, color]) => (
+                <Row
+                  key={key}
+                  icon={
+                    <IconTile color={color}>
+                      <Icon size={17} />
+                    </IconTile>
+                  }
+                  title={title}
+                  subtitle={sub}
+                  trailing={<Switch on={own[key]} onChange={(v) => updateOwn({ [key]: v })} label={title} />}
+                  onClick={() => updateOwn({ [key]: !own[key] })}
+                />
+              ))}
+              <Row
+                icon={
+                  <IconTile color="purple">
+                    <Pill size={17} />
+                  </IconTile>
+                }
+                title="Antibiotics"
+                subtitle="Who gets treated"
+              >
+                <Segmented<AbxStrategy>
+                  value={own.abx}
+                  onChange={(v) => updateOwn({ abx: v })}
+                  options={[
+                    { id: 'reactive', label: 'Sick cows' },
+                    { id: 'targeted', label: 'Exposed pens' },
+                    { id: 'blanket', label: 'Whole barn' },
+                  ]}
+                />
+              </Row>
+              <Row
+                icon={
+                  <IconTile color="orange">
+                    <Timer size={17} />
+                  </IconTile>
+                }
+                title="Act at"
+                subtitle={`Hour ${own.actionHour} · ${hourLabel(own.actionHour)}${own.actionHour <= TIMELINE.defaultActionHour ? ' — as early as BarnTwin can spot it' : ''}`}
+                divider={false}
+              >
+                <input
+                  type="range"
+                  min={TIMELINE.crisisHour}
+                  max={96}
+                  step={2}
+                  value={own.actionHour}
+                  onChange={(e) => updateOwn({ actionHour: Number(e.target.value) })}
+                  aria-label="Hour to act"
+                  className="ios-slider"
+                  style={{ ['--fill' as string]: `${actFill}%`, ['--fill-bg' as string]: '#22d3ee' }}
+                />
+              </Row>
             </div>
-            <div className="flex items-center gap-2">
-              <Pill size={15} className="text-slate-400" />
-              <span className="text-[12.5px] font-semibold text-slate-300">Antibiotics</span>
-              <div className="flex flex-1 rounded-lg border border-slate-700 p-0.5">
-                {abx.map((a) => (
-                  <button
-                    type="button"
-                    key={a.id}
-                    onClick={() => updateOwn({ abx: a.id })}
-                    className={`flex-1 rounded-md px-2 py-1 text-[12px] font-semibold ${own.abx === a.id ? 'bg-cyan-400 text-slate-950' : 'text-slate-400 hover:text-white'}`}
-                  >
-                    {a.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="whitespace-nowrap text-[12.5px] font-semibold text-slate-300">Act at Hour {own.actionHour}</span>
-              <input
-                type="range"
-                min={TIMELINE.crisisHour}
-                max={96}
-                step={2}
-                value={own.actionHour}
-                onChange={(e) => updateOwn({ actionHour: Number(e.target.value) })}
-                className="flex-1 accent-cyan-400"
-              />
-            </div>
-            <Outcome s={bundle.current.summary} base={base} highlight />
-          </div>
+          </motion.div>
         )}
-      </ChoiceCard>
+      </AnimatePresence>
 
-      <div className="flex items-center justify-between pt-1">
-        <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-[14px] font-semibold text-slate-300 hover:text-white">
-          <ArrowLeft size={16} /> Back to the crisis
+      <div className={`mt-5 rounded-[18px] px-5 py-4 transition-colors duration-300 ${choice === 'none' ? 'bg-red-500/[0.08]' : saved >= 0 ? 'bg-emerald-500/[0.08]' : 'bg-red-500/[0.08]'}`}>
+        <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">This week, with your choice</div>
+        <div className={`mt-1 text-[30px] font-bold tracking-tight ${choice === 'none' || saved < 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+          <AnimatedNumber value={choice === 'none' ? chosen.cost.total : Math.abs(saved)} format={money} />{' '}
+          <span className="text-[17px] font-semibold text-slate-300">{choice === 'none' ? 'herd loss' : saved >= 0 ? 'saved' : 'extra loss'}</span>
+        </div>
+        <div className="mt-0.5 text-[14px] text-slate-300">
+          <AnimatedNumber value={chosen.clinicalCases} /> sick cows · <AnimatedNumber value={chosen.deaths} /> {chosen.deaths === 1 ? 'death' : 'deaths'} · <AnimatedNumber value={chosen.antibioticDoses} /> antibiotic doses
+          {choice !== 'none' && <span className="text-slate-500"> (vs {base.clinicalCases} sick if nobody acts)</span>}
+        </div>
+      </div>
+
+      <div className="mt-6 flex items-center justify-between">
+        <button type="button" onClick={onBack} className="flex items-center gap-1 text-[15px] font-medium text-slate-400 hover:text-white">
+          <ChevronLeft size={18} /> Back
         </button>
         <button
           type="button"
           onClick={onStart}
-          className="flex items-center gap-2 rounded-lg bg-emerald-400 px-6 py-2.5 text-[15px] font-bold text-slate-950 shadow-[0_0_24px_rgba(52,211,153,0.45)] hover:bg-emerald-300"
+          className="press flex items-center gap-2 rounded-full bg-emerald-400 px-6 py-2.5 text-[15px] font-semibold text-slate-950 shadow-[0_8px_30px_-6px_rgba(52,211,153,0.6)] hover:bg-emerald-300"
         >
-          <Play size={17} /> Start simulation
+          <Play size={16} fill="currentColor" /> Start simulation
         </button>
       </div>
-    </div>
+    </>
   )
 }
 
-/** Guided setup: 1) crisis (AI translation or manual), 2) response, 3) run on a clean page. */
+/** Guided setup: 1) crisis, 2) response, then the clean run page. */
 export default function SetupPage() {
   const [step, setStep] = useState<Step>(() => (window.location.hash.includes('response') ? 'response' : 'crisis'))
+  const [dir, setDir] = useState(1)
   const startRun = useSim((s) => s.startRun)
 
   useEffect(() => {
     useSim.setState({ playing: false, hour: 30, selectedPen: null, projectionOpen: false })
   }, [])
 
-  return (
-    <div className="relative h-full w-full select-none font-sans">
-      <div className="absolute inset-0">
-        <BarnScene sidePanels={false} />
-      </div>
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950/85" />
+  const go = (next: Step) => {
+    setDir(next === 'response' ? 1 : -1)
+    setStep(next)
+  }
 
-      <div className="absolute inset-0 flex flex-col overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4">
-          <a href="#/" className="flex items-center gap-2">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-cyan-400 to-emerald-500 font-black text-slate-950">B</div>
-            <span className="text-[16px] font-bold text-white">BarnTwin</span>
-          </a>
-          <Stepper step={step} />
-          <a href="#/lab" className="text-[12.5px] font-semibold text-slate-400 hover:text-white">
-            Expert view →
-          </a>
+  return (
+    <MotionConfig reducedMotion="user">
+      <div className="relative h-full w-full select-none font-sans">
+        <div className="absolute inset-0">
+          <BarnScene sidePanels={false} />
         </div>
-        <div className="flex flex-1 items-start justify-center px-4 pb-8 pt-2">
-          <div className="w-full max-w-[760px] rounded-2xl border border-slate-700/70 bg-slate-950/85 p-6 shadow-2xl backdrop-blur">
-            {step === 'crisis' ? (
-              <CrisisStep onNext={() => setStep('response')} />
-            ) : (
-              <ResponseStep
-                onBack={() => setStep('crisis')}
-                onStart={() => {
-                  startRun()
-                  window.location.hash = '#/run'
-                }}
-              />
-            )}
+        <div className="absolute inset-0 bg-slate-950/45" />
+
+        <div className="absolute inset-0 flex flex-col overflow-y-auto">
+          <div className="flex items-center justify-between px-6 py-4">
+            <a href="#/" className="flex items-center gap-2">
+              <div className="grid h-8 w-8 place-items-center rounded-[9px] bg-gradient-to-br from-cyan-400 to-emerald-500 font-black text-slate-950">B</div>
+              <span className="text-[16px] font-semibold text-white">BarnTwin</span>
+            </a>
+            <PageDots step={step} />
+            <a href="#/lab" className="text-[13px] font-medium text-slate-400 hover:text-white">
+              Expert view
+            </a>
+          </div>
+
+          <div className="flex flex-1 items-start justify-center px-4 pb-10 pt-2 md:items-center">
+            <motion.div layout transition={SPRING} className="sheet w-full max-w-[600px] overflow-hidden rounded-[28px] p-7">
+              <AnimatePresence mode="popLayout" custom={dir} initial={false}>
+                <motion.div key={step} custom={dir} variants={stepVariants} initial="enter" animate="center" exit="exit" transition={SPRING}>
+                  {step === 'crisis' ? (
+                    <CrisisStep onNext={() => go('response')} />
+                  ) : (
+                    <ResponseStep
+                      onBack={() => go('crisis')}
+                      onStart={() => {
+                        startRun()
+                        window.location.hash = '#/run'
+                      }}
+                    />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </motion.div>
           </div>
         </div>
       </div>
-    </div>
+    </MotionConfig>
   )
 }

@@ -18,6 +18,8 @@ npm run build      # type-check + production bundle in dist/
 npm run lint       # oxlint
 ```
 
+**Deploy (Vercel, free):** import the GitHub repo. Vite is auto-detected: build `npm run build`, output `dist`. In *Project → Settings → Git → Production Branch*, set the branch the app lives on (currently `digital-twin`). Every push to that branch then redeploys automatically. The app is fully static and needs no environment variables or secrets.
+
 No backend, no API keys. Everything (physics, epidemiology, economics, rendering) runs in the browser.
 
 ### Pages & user journey
@@ -25,12 +27,12 @@ No backend, no API keys. Everything (physics, epidemiology, economics, rendering
 | Route | Page |
 |---|---|
 | `#/` | **Landing page.** Explains what BarnTwin does and shows live results from the model. The background is the animated pasture. |
-| `#/simulate` | **Setup wizard.** The live barn stays dimmed in the background.<br>**1 · Crisis:** *Describe it* and the BarnTwin AI translator turns plain English such as "104°F and the middle fan broke" into model settings, or *Set it up manually* with a heatwave slider and a Fan B fault switch.<br>**2 · Response:** choose the *BarnTwin AI recommendation*, *No intervention*, or *Choose my own interventions*. Each option shows its projected 7-day outcome instantly.<br>**3 · Start simulation.** |
+| `#/simulate` | **Setup wizard.** The live barn stays dimmed in the background.<br>**1 · Crisis:** type a sentence into **Smart translate** (e.g. "104°F and the middle fan broke"). It shows how it reads the sentence as you type, and pressing Return applies it to the heatwave slider and Fan B switch. You can also set those controls directly.<br>**2 · Response:** choose *BarnTwin plan* (recommended), *Do nothing*, or *Customize* (switches, an antibiotic selector, and when to act). The 7-day outcome updates instantly.<br>**3 · Start simulation.** |
 | `#/run` | **Clean run page.** Only the barn, the story banner, the X-Ray toggle, a projection button and the timeline, with no control parameters. Playback starts from Hour 0. At the end of the week a summary card offers *See full projection*, *Try another response* or *Replay*. |
 | `#/lab` | **Expert view.** The 4-step guided demo presets plus every control and the BarnTwin AI panel on one screen. |
 | `#/pasture` | **Pasture mode.** Grazing Holsteins with moos. Birdsong plays by day and crickets by night (day/night toggle). Click *Turn on moos & birdsong*; browsers need a click before playing audio. |
 
-The scenario translator (`src/sim/scenarioParser.ts`) is a local, rule-based parser, not an LLM. Nothing leaves the browser. It extracts what the model can simulate: the heatwave peak (°C or °F, or words like "scorching"), whether a fan fails, and whether all fans are healthy. It tells you when it converts, clamps or remaps a value.
+Smart translate (`src/sim/scenarioParser.ts`) is a local, rule-based parser, not an LLM or other AI model. Nothing leaves the browser. It extracts what the model can simulate: the heatwave peak (°C or °F, or words like "scorching"), whether a fan fails, and whether all fans are healthy. It tells you when it converts, clamps or remaps a value.
 
 **Sound credits:** the moo, birdsong and cricket clips in `public/sounds/` were downloaded from [myinstants.com](https://www.myinstants.com) (`cow-moo`, `birds-chirpingss`, `birds-chirping-js`, `crickets-chirping`). They are user-uploaded, so check their licensing before any public or commercial release. If a clip fails to load, the app falls back to synthesized Web Audio sounds.
 
