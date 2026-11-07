@@ -1,49 +1,66 @@
-import { Brain, Eye } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { Eye, ScanEye } from 'lucide-react'
 import { buildStory, type Tone } from '../../sim/narrative'
 import { useSim, type PresetId } from '../../store/useSimulationStore'
+import { SPRING } from '../ui/spring'
 
-const TONE: Record<Tone, { border: string; dot: string; label: string }> = {
-  calm: { border: 'border-sky-500/40', dot: 'bg-sky-400', label: 'text-sky-300' },
-  warn: { border: 'border-amber-500/50', dot: 'bg-amber-400', label: 'text-amber-300' },
-  danger: { border: 'border-red-500/60', dot: 'bg-red-500 animate-pulse', label: 'text-red-300' },
-  good: { border: 'border-emerald-500/50', dot: 'bg-emerald-400', label: 'text-emerald-300' },
+const TONE_DOT: Record<Tone, string> = {
+  calm: 'bg-sky-400',
+  warn: 'bg-amber-400',
+  danger: 'bg-red-500',
+  good: 'bg-emerald-400',
 }
 
-const PRESETS: { id: PresetId; title: string; sub: string }[] = [
-  { id: 1, title: '1. Crisis Hits', sub: 'Hour 18 · heatwave + Fan B fails' },
-  { id: 2, title: '2. Hidden Spread', sub: 'Hour 36 · reveal silent infections' },
-  { id: 3, title: '3. Why Naive Fan Boost Fails', sub: 'Crank fans +25%, nothing else' },
-  { id: 4, title: '4. BarnTwin Smart Fix', sub: 'Isolate · ventilate · cool · target' },
+const PRESETS: { id: PresetId; title: string; hint: string }[] = [
+  { id: 1, title: 'Crisis hits', hint: 'Hour 18 · heatwave + Fan B fails' },
+  { id: 2, title: 'Hidden spread', hint: 'Hour 36 · reveal silent infections' },
+  { id: 3, title: 'Naive fix', hint: 'Crank fans +25%, nothing else' },
+  { id: 4, title: 'BarnTwin fix', hint: 'Isolate · ventilate · cool · target' },
 ]
 
+/** Farmer's Eye ↔ AI X-Ray. The selection slides between the two views. */
 export function XRayToggle() {
   const xray = useSim((s) => s.xray)
   const setXray = useSim((s) => s.setXray)
+  const options = [
+    { on: false, label: "Farmer's Eye", icon: <Eye size={15} /> },
+    { on: true, label: 'AI X-Ray', icon: <ScanEye size={15} /> },
+  ]
   return (
-    <div className="flex rounded-xl border border-slate-600/50 bg-slate-950/80 p-1 text-[13px] font-semibold shadow-lg">
-      <button
-        type="button"
-        onClick={() => setXray(false)}
-        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors ${
-          !xray ? 'bg-slate-200 text-slate-900' : 'text-slate-400 hover:text-slate-200'
-        }`}
-      >
-        <Eye size={15} /> Farmer&apos;s Eye
-      </button>
-      <button
-        type="button"
-        onClick={() => setXray(true)}
-        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors ${
-          xray ? 'bg-yellow-400 text-slate-950 shadow-[0_0_18px_rgba(250,204,21,0.55)]' : 'text-slate-400 hover:text-yellow-200'
-        }`}
-      >
-        <Brain size={15} /> BarnTwin AI X-Ray
-      </button>
+    <div className="panel flex !rounded-full p-1" role="radiogroup" aria-label="View">
+      {options.map((o) => {
+        const active = xray === o.on
+        return (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={active}
+            key={o.label}
+            onClick={() => setXray(o.on)}
+            title={o.on ? 'Reveal cows that are infected but not sick yet (X)' : 'What the farmer can see (X)'}
+            className={`relative flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+              active ? 'text-slate-950' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            {active && (
+              <motion.span
+                layoutId="xray-pill"
+                transition={SPRING}
+                className={`absolute inset-0 rounded-full ${o.on ? 'bg-yellow-300 shadow-[0_0_20px_rgba(253,224,71,0.5)]' : 'bg-white'}`}
+              />
+            )}
+            <span className="relative flex items-center gap-1.5">
+              {o.icon}
+              {o.label}
+            </span>
+          </button>
+        )
+      })}
     </div>
   )
 }
 
-/** One-sentence "What's happening now" narration of the current hour. */
+/** One-sentence narration of the current hour, like a caption. */
 export function StoryBanner({ className = '' }: { className?: string }) {
   const bundle = useSim((s) => s.bundle)
   const kind = useSim((s) => s.planKind)
@@ -51,60 +68,84 @@ export function StoryBanner({ className = '' }: { className?: string }) {
   const xray = useSim((s) => s.xray)
   const fault = useSim((s) => s.crisis.fanBFault)
   const story = buildStory(bundle, kind, hour, xray, fault)
-  const tone = TONE[story.tone]
+  const [lead, ...rest] = story.headline.split(': ')
+  const body = rest.join(': ')
   return (
-    <div className={`panel flex items-center gap-3 border px-4 py-2.5 ${tone.border} ${className}`}>
-      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${tone.dot}`} />
-      <div className="min-w-0">
-        <div className={`text-[10px] font-bold uppercase tracking-[0.18em] ${tone.label}`}>What&apos;s happening now</div>
-        <div className="text-[15px] font-medium leading-snug text-slate-50">{story.headline}</div>
-      </div>
+    <div className={`panel flex items-start gap-3 px-4 py-3 ${className}`} aria-live="polite">
+      <span className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${TONE_DOT[story.tone]} ${story.tone === 'danger' ? 'animate-pulse' : ''}`} />
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.p
+          key={story.headline}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          className="min-w-0 text-[15px] leading-snug text-slate-100"
+        >
+          {body ? (
+            <>
+              <span className="font-semibold text-white">{lead}.</span> {body}
+            </>
+          ) : (
+            story.headline
+          )}
+        </motion.p>
+      </AnimatePresence>
     </div>
   )
 }
 
+/** Expert-view header: toolbar + guided demo + view toggle. */
 export default function StoryStepper() {
   const preset = useSim((s) => s.preset)
   const applyPreset = useSim((s) => s.applyPreset)
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-center gap-2 px-4 pt-3">
-      <div className="pointer-events-auto flex w-full max-w-[1180px] items-center gap-3">
-        <div className="panel flex shrink-0 flex-col gap-1 px-3 py-2">
-          <a href="#/" className="flex items-center gap-2" title="Back to the BarnTwin home page">
-            <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-cyan-400 to-emerald-500 text-sm font-black text-slate-950">B</div>
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-center gap-2 px-3 pt-3">
+      <div className="pointer-events-auto flex w-full items-start gap-3">
+        <div className="panel flex shrink-0 items-center gap-3 px-3 py-2">
+          <a href="#/" className="flex items-center gap-2" title="BarnTwin home">
+            <div className="grid h-8 w-8 place-items-center rounded-[9px] bg-gradient-to-br from-cyan-400 to-emerald-500 text-sm font-black text-slate-950">B</div>
             <div className="leading-tight">
-              <div className="text-[13px] font-bold tracking-wide text-slate-100">BarnTwin</div>
-              <div className="text-[10px] text-slate-400">Predicts hidden disease from barn air</div>
+              <div className="text-[14px] font-semibold text-white">BarnTwin</div>
+              <div className="text-[11.5px] text-slate-400">Expert view</div>
             </div>
           </a>
-          <nav className="flex gap-2 text-[10.5px] font-semibold">
-            <a href="#/" className="text-slate-400 hover:text-white">Home</a>
-            <a href="#/simulate" className="text-slate-400 hover:text-white">New scenario</a>
-            <span className="text-cyan-300">Expert view</span>
-            <a href="#/pasture" className="text-slate-400 hover:text-white">Pasture 🐄</a>
+          <nav className="flex items-center gap-1 text-[12.5px] font-medium">
+            <a href="#/simulate" className="press rounded-full px-2.5 py-1 text-slate-300 hover:bg-white/10 hover:text-white">
+              New scenario
+            </a>
+            <a href="#/pasture" className="press rounded-full px-2.5 py-1 text-slate-300 hover:bg-white/10 hover:text-white">
+              Pasture
+            </a>
           </nav>
         </div>
-        <StoryBanner className="flex-1" />
+        <StoryBanner className="min-w-0 flex-1" />
       </div>
-      <div className="pointer-events-auto flex w-full max-w-[1180px] items-center gap-2">
-        {PRESETS.map((p) => (
-          <button
-            type="button"
-            key={p.id}
-            onClick={() => applyPreset(p.id)}
-            className={`min-w-0 flex-1 rounded-lg border px-3 py-1.5 text-left transition-all ${
-              preset === p.id
-                ? p.id === 4
-                  ? 'border-emerald-400 bg-emerald-500/20 shadow-[0_0_16px_rgba(16,185,129,0.35)]'
-                  : 'border-cyan-400 bg-cyan-500/15 shadow-[0_0_16px_rgba(34,211,238,0.3)]'
-                : 'border-slate-700/70 bg-slate-950/75 hover:border-slate-500'
-            }`}
-          >
-            <div className="text-[12.5px] font-bold text-slate-100">{p.title}</div>
-            <div className="truncate text-[10.5px] text-slate-400">{p.sub}</div>
-          </button>
-        ))}
+      <div className="pointer-events-auto flex w-full items-center justify-center gap-3">
+        <div className="panel flex items-center gap-1 !rounded-full p-1" role="radiogroup" aria-label="Guided demo">
+          <span className="px-3 text-[12.5px] font-medium text-slate-400">Guided demo</span>
+          {PRESETS.map((p) => {
+            const active = preset === p.id
+            return (
+              <button
+                type="button"
+                role="radio"
+                aria-checked={active}
+                key={p.id}
+                onClick={() => applyPreset(p.id)}
+                title={`${p.hint} (key ${p.id})`}
+                className={`press relative flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-[13px] font-semibold transition-colors ${
+                  active ? 'text-slate-950' : 'text-slate-200 hover:bg-white/[0.07]'
+                }`}
+              >
+                {active && <motion.span layoutId="preset-pill" transition={SPRING} className={`absolute inset-0 rounded-full ${p.id === 4 ? 'bg-emerald-300' : 'bg-white'}`} />}
+                <span className={`relative grid h-5 w-5 place-items-center rounded-full text-[11px] font-bold ${active ? 'bg-slate-950/15' : 'bg-white/10'}`}>{p.id}</span>
+                <span className="relative">{p.title}</span>
+              </button>
+            )
+          })}
+        </div>
         <XRayToggle />
       </div>
     </div>

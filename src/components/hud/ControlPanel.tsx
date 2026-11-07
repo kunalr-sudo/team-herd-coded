@@ -1,71 +1,21 @@
-import { ChevronDown, ChevronLeft, Clock, Droplets, Fan, Flame, Hospital, Layers, Pill, RotateCcw, SlidersHorizontal, Stethoscope, Wind } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
-import { HERD_SIZE, TIMELINE } from '../../sim/constants'
+import { ChevronLeft, Droplets, Fan, Flame, Hospital, Layers, Pill, SlidersHorizontal, Timer, Wind } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { HERD_SIZE, TIMELINE, hourLabel } from '../../sim/constants'
 import type { AbxStrategy } from '../../sim/cattleEngine'
 import { penList } from '../../sim/narrative'
 import { useSim, type HeatmapMode } from '../../store/useSimulationStore'
 import { HEATMAP_LEGEND } from '../canvas/heatmapLegend'
+import { IconTile, Row, Segmented, Switch } from '../ui/controls'
 
-function Toggle({
-  on,
-  onChange,
-  icon,
-  title,
-  sub,
-  accent = 'emerald',
-}: {
-  on: boolean
-  onChange: (v: boolean) => void
-  icon: ReactNode
-  title: string
-  sub: string
-  accent?: 'emerald' | 'red'
-}) {
-  const onCls = accent === 'red' ? 'border-red-500/60 bg-red-500/10' : 'border-emerald-500/60 bg-emerald-500/10'
-  const knob = accent === 'red' ? 'bg-red-500' : 'bg-emerald-500'
+function Section({ title, footer, children }: { title: string; footer?: string; children: ReactNode }) {
   return (
-    <button
-      type="button"
-      onClick={() => onChange(!on)}
-      className={`flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-colors ${
-        on ? onCls : 'border-slate-700/60 bg-slate-900/40 hover:border-slate-500'
-      }`}
-    >
-      <span className={on ? (accent === 'red' ? 'text-red-300' : 'text-emerald-300') : 'text-slate-500'}>{icon}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[12.5px] font-semibold text-slate-100">{title}</span>
-        <span className="block text-[10.5px] leading-tight text-slate-400">{sub}</span>
-      </span>
-      <span className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${on ? knob : 'bg-slate-700'}`}>
-        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
-      </span>
-    </button>
+    <section>
+      <h3 className="mb-1.5 px-4 text-[12px] font-medium uppercase tracking-[0.06em] text-slate-400">{title}</h3>
+      <div className="grouped">{children}</div>
+      {footer && <p className="mt-1.5 px-4 text-[12px] leading-snug text-slate-500">{footer}</p>}
+    </section>
   )
 }
-
-function Section({ title, hint, icon, children, defaultOpen = true }: { title: string; hint?: string; icon: ReactNode; children: ReactNode; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <div className="rounded-lg border border-slate-800/80">
-      <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center gap-1.5 px-2.5 py-2 text-left">
-        <span className="text-slate-400">{icon}</span>
-        <span className="flex-1">
-          <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-300">{title}</span>
-          {hint && <span className="block text-[10.5px] text-slate-500">{hint}</span>}
-        </span>
-        <ChevronDown size={15} className={`text-slate-500 transition-transform ${open ? '' : '-rotate-90'}`} />
-      </button>
-      {open && <div className="space-y-1.5 px-2 pb-2">{children}</div>}
-    </div>
-  )
-}
-
-const LAYERS: { id: HeatmapMode; label: string }[] = [
-  { id: 'germ', label: 'Germ plume' },
-  { id: 'heat', label: 'Heat stress' },
-  { id: 'ammonia', label: 'Ammonia' },
-  { id: 'none', label: 'Off' },
-]
 
 export default function ControlPanel() {
   const open = useSim((s) => s.controlsOpen)
@@ -79,111 +29,164 @@ export default function ControlPanel() {
   const applyRecommendation = useSim((s) => s.applyRecommendation)
   const heatmap = useSim((s) => s.heatmap)
   const setHeatmap = useSim((s) => s.setHeatmap)
-  const xray = useSim((s) => s.xray)
   const current = useSim((s) => s.bundle.current)
   const targeted = current.config.abx === 'targeted' ? current.targetedPens : []
 
   if (!open)
     return (
-      <button
-        type="button"
-        onClick={toggle}
-        className="panel pointer-events-auto absolute left-3 top-[156px] z-10 flex items-center gap-2 px-3 py-2 text-[12.5px] font-semibold text-slate-200 hover:text-white"
-      >
-        <SlidersHorizontal size={16} className="text-cyan-300" /> Crisis & response controls
+      <button type="button" onClick={toggle} className="panel press pointer-events-auto absolute left-3 top-[140px] z-10 flex items-center gap-2 !rounded-full px-4 py-2.5 text-[13.5px] font-medium text-white">
+        <SlidersHorizontal size={16} className="text-cyan-300" /> Controls
       </button>
     )
 
-  const abxOptions: { id: AbxStrategy; label: string; sub: string }[] = [
-    { id: 'reactive', label: 'Reactive only', sub: 'Treat cows once they look sick' },
-    { id: 'blanket', label: 'Whole-barn blanket', sub: `${HERD_SIZE} preventive doses` },
-    {
-      id: 'targeted',
-      label: 'Targeted (BarnTwin)',
-      sub: targeted.length ? `${penList(targeted)} · ${current.summary.metaphylaxisDoses} doses` : 'Only the 2 most exposed pens',
-    },
-  ]
+  const heatFill = ((crisis.heatwaveTemp - 30) / 12) * 100
+  const actFill = ((plan.actionHour - TIMELINE.crisisHour) / (96 - TIMELINE.crisisHour)) * 100
+  const abxHint =
+    plan.abx === 'targeted' && targeted.length
+      ? `${penList(targeted)} · ${current.summary.metaphylaxisDoses} doses`
+      : plan.abx === 'blanket'
+        ? `${HERD_SIZE} preventive doses`
+        : 'Only cows that look sick'
 
   return (
-    <div className="panel pointer-events-auto absolute left-3 top-[156px] bottom-[96px] z-10 flex w-[296px] flex-col overflow-hidden">
-      <div className="flex items-center justify-between border-b border-slate-700/60 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal size={16} className="text-cyan-300" />
-          <span className="text-[13px] font-bold text-slate-100">Crisis & response</span>
-        </div>
-        <button type="button" onClick={toggle} className="text-slate-400 hover:text-white" aria-label="Collapse panel" title="Collapse">
-          <ChevronLeft size={18} />
+    <div className="panel pointer-events-auto absolute left-3 top-[140px] bottom-[108px] z-10 flex w-[320px] flex-col overflow-hidden">
+      <div className="flex items-center justify-between px-4 pt-3.5 pb-2">
+        <div className="text-[17px] font-semibold tracking-tight text-white">Controls</div>
+        <button type="button" onClick={toggle} className="press grid h-7 w-7 place-items-center rounded-full bg-white/10 text-slate-300 hover:text-white" aria-label="Collapse panel" title="Collapse">
+          <ChevronLeft size={16} />
         </button>
       </div>
 
-      <div className="flex-1 space-y-2 overflow-y-auto p-2.5">
-        <div className="grid grid-cols-2 gap-1.5">
-          <button
-            type="button"
-            onClick={applyRecommendation}
-            disabled={kind === 'smart'}
-            className="rounded-lg bg-emerald-500 px-2 py-1.5 text-[12px] font-bold text-slate-950 hover:bg-emerald-400 disabled:cursor-default disabled:opacity-50"
-          >
-            {kind === 'smart' ? '✓ BarnTwin plan' : 'Use BarnTwin plan'}
-          </button>
-          <button
-            type="button"
-            onClick={resetPlan}
-            disabled={kind === 'none'}
-            className="flex items-center justify-center gap-1 rounded-lg border border-slate-600 px-2 py-1.5 text-[12px] font-semibold text-slate-200 hover:border-slate-400 disabled:opacity-40"
-          >
-            <RotateCcw size={13} /> No action
-          </button>
+      <div className="flex-1 space-y-5 overflow-y-auto px-3 pb-4">
+        <div className="px-1">
+          <Segmented
+            value={kind === 'smart' ? 'smart' : kind === 'none' ? 'none' : 'custom'}
+            onChange={(v) => (v === 'smart' ? applyRecommendation() : v === 'none' ? resetPlan() : undefined)}
+            options={[
+              { id: 'none', label: 'No action' },
+              { id: 'smart', label: 'BarnTwin plan' },
+            ]}
+          />
+          <p className="mt-1.5 px-1 text-[12px] text-slate-500">
+            {kind === 'custom' || kind === 'naive' ? 'Custom plan — your own choices below.' : 'Or change any switch below to build your own plan.'}
+          </p>
         </div>
 
-        <Section title="Crisis" hint="What goes wrong" icon={<Flame size={13} />}>
-          <div className="rounded-lg border border-slate-700/60 bg-slate-900/40 px-2.5 py-1.5">
-            <div className="flex justify-between text-[12.5px] font-semibold text-slate-100">
-              <span>Heatwave peak</span>
-              <span className="font-mono text-orange-300">{crisis.heatwaveTemp}°C</span>
-            </div>
+        <Section title="Crisis">
+          <Row
+            icon={
+              <IconTile color="orange">
+                <Flame size={16} />
+              </IconTile>
+            }
+            title="Heatwave peak"
+            trailing={<span className="text-[15px] font-semibold tabular-nums text-white">{crisis.heatwaveTemp}°C</span>}
+          >
             <input
               type="range"
               min={30}
               max={42}
               value={crisis.heatwaveTemp}
               onChange={(e) => setCrisis({ heatwaveTemp: Number(e.target.value) })}
-              className="mt-1 w-full accent-orange-400"
+              aria-label="Heatwave peak"
+              className="ios-slider"
+              style={{ ['--fill' as string]: `${heatFill}%`, ['--fill-bg' as string]: 'linear-gradient(90deg,#fbbf24,#f97316,#ef4444)' }}
             />
-          </div>
-          <Toggle on={crisis.fanBFault} onChange={(v) => setCrisis({ fanBFault: v })} icon={<Fan size={16} />} title="Fan B fails at Hour 18" sub="Centre exhaust fan stalls" accent="red" />
+          </Row>
+          <Row
+            icon={
+              <IconTile color={crisis.fanBFault ? 'red' : 'slate'}>
+                <Fan size={16} />
+              </IconTile>
+            }
+            title="Fan B fails"
+            subtitle={`At ${hourLabel(TIMELINE.crisisHour)}`}
+            trailing={<Switch on={crisis.fanBFault} onChange={(v) => setCrisis({ fanBFault: v })} label="Fan B fails" tone="red" />}
+            onClick={() => setCrisis({ fanBFault: !crisis.fanBFault })}
+            divider={false}
+          />
         </Section>
 
-        <Section title="Disease response" hint="Stop the spread" icon={<Stethoscope size={13} />}>
-          <Toggle on={plan.isolate} onChange={(v) => setPlan({ isolate: v })} icon={<Hospital size={16} />} title="Isolate sick cows" sub="Move them to the downwind Hospital Pen" />
-          <div className="rounded-lg border border-slate-700/60 bg-slate-900/40 p-1.5">
-            <div className="mb-1 flex items-center gap-1.5 px-1 text-[12.5px] font-semibold text-slate-100">
-              <Pill size={14} className="text-slate-400" /> Antibiotics
-            </div>
-            {abxOptions.map((o) => (
-              <button
-                type="button"
-                key={o.id}
-                onClick={() => setPlan({ abx: o.id })}
-                className={`w-full rounded-md border px-2 py-1 text-left transition-colors ${
-                  plan.abx === o.id ? 'border-cyan-400/70 bg-cyan-500/15 text-slate-100' : 'border-transparent text-slate-400 hover:bg-slate-800/60'
-                }`}
-              >
-                <div className="text-[12px] font-semibold">{o.label}</div>
-                <div className="text-[10.5px] text-slate-400">{o.sub}</div>
-              </button>
-            ))}
-          </div>
+        <Section title="Disease response">
+          <Row
+            icon={
+              <IconTile color="red">
+                <Hospital size={16} />
+              </IconTile>
+            }
+            title="Isolate sick cows"
+            subtitle="Downwind Hospital Pen"
+            trailing={<Switch on={plan.isolate} onChange={(v) => setPlan({ isolate: v })} label="Isolate sick cows" />}
+            onClick={() => setPlan({ isolate: !plan.isolate })}
+          />
+          <Row
+            icon={
+              <IconTile color="purple">
+                <Pill size={16} />
+              </IconTile>
+            }
+            title="Antibiotics"
+            subtitle={abxHint}
+            divider={false}
+          >
+            <Segmented<AbxStrategy>
+              value={plan.abx}
+              onChange={(v) => setPlan({ abx: v })}
+              options={[
+                { id: 'reactive', label: 'Sick' },
+                { id: 'targeted', label: 'Exposed' },
+                { id: 'blanket', label: 'All' },
+              ]}
+            />
+          </Row>
         </Section>
 
-        <Section title="Climate response" hint="Fix the air that spreads it" icon={<Wind size={13} />}>
-          <Toggle on={plan.boostVent} onChange={(v) => setPlan({ boostVent: v })} icon={<Wind size={16} />} title="Boost ventilation +25%" sub="Run the working fans harder" />
-          <Toggle on={plan.rebalance} onChange={(v) => setPlan({ rebalance: v })} icon={<Fan size={16} />} title="Rebalance airflow" sub="Close Pen 3 baffles + portable fan at B" />
-          <Toggle on={plan.misters} onChange={(v) => setPlan({ misters: v })} icon={<Droplets size={16} />} title="Cooling misters" sub="Evaporative cooling at the inlets" />
+        <Section title="Climate response">
+          <Row
+            icon={
+              <IconTile color="blue">
+                <Wind size={16} />
+              </IconTile>
+            }
+            title="Boost fans +25%"
+            trailing={<Switch on={plan.boostVent} onChange={(v) => setPlan({ boostVent: v })} label="Boost fans" />}
+            onClick={() => setPlan({ boostVent: !plan.boostVent })}
+          />
+          <Row
+            icon={
+              <IconTile color="teal">
+                <Fan size={16} />
+              </IconTile>
+            }
+            title="Rebalance airflow"
+            subtitle="Baffles + portable fan"
+            trailing={<Switch on={plan.rebalance} onChange={(v) => setPlan({ rebalance: v })} label="Rebalance airflow" />}
+            onClick={() => setPlan({ rebalance: !plan.rebalance })}
+          />
+          <Row
+            icon={
+              <IconTile color="cyan">
+                <Droplets size={16} />
+              </IconTile>
+            }
+            title="Cooling misters"
+            trailing={<Switch on={plan.misters} onChange={(v) => setPlan({ misters: v })} label="Cooling misters" />}
+            onClick={() => setPlan({ misters: !plan.misters })}
+            divider={false}
+          />
         </Section>
 
-        <Section title="When to act" hint={`Hour ${plan.actionHour}`} icon={<Clock size={13} />}>
-          <div className="px-1">
+        <Section title="When to act" footer={`BarnTwin spots the hidden spread by Hour ${TIMELINE.defaultActionHour}. Farmers usually notice about 48 hours later.`}>
+          <Row
+            icon={
+              <IconTile color="orange">
+                <Timer size={16} />
+              </IconTile>
+            }
+            title={`Hour ${plan.actionHour}`}
+            subtitle={hourLabel(plan.actionHour)}
+            divider={false}
+          >
             <input
               type="range"
               min={TIMELINE.crisisHour}
@@ -191,40 +194,44 @@ export default function ControlPanel() {
               step={2}
               value={plan.actionHour}
               onChange={(e) => setPlan({ actionHour: Number(e.target.value) })}
-              className="w-full accent-cyan-400"
+              aria-label="Hour to act"
+              className="ios-slider"
+              style={{ ['--fill' as string]: `${actFill}%`, ['--fill-bg' as string]: '#22d3ee' }}
             />
-            <div className="text-[10.5px] leading-snug text-slate-400">
-              BarnTwin spots the hidden spread by Hour {TIMELINE.defaultActionHour}. A farmer usually notices ~48 h later — try acting late to see the cost of waiting.
-            </div>
-          </div>
+          </Row>
         </Section>
 
-        <Section title="Floor map" hint="Colour the barn floor by…" icon={<Layers size={13} />} defaultOpen={false}>
-          <div className="grid grid-cols-4 gap-1">
-            {LAYERS.map((l) => (
-              <button
-                type="button"
-                key={l.id}
-                onClick={() => setHeatmap(l.id)}
-                className={`rounded-md border px-1 py-1 text-[11px] font-semibold transition-colors ${
-                  heatmap === l.id ? 'border-cyan-400/70 bg-cyan-500/15 text-slate-100' : 'border-slate-700/60 text-slate-400 hover:border-slate-500'
-                }`}
-              >
-                {l.label}
-              </button>
-            ))}
-          </div>
-          {heatmap === 'germ' && !xray && <div className="text-[10.5px] text-yellow-300">Germ plume needs AI X-Ray (switched on).</div>}
-          {heatmap !== 'none' && (
-            <div>
-              <div className="h-2 rounded-full" style={{ background: HEATMAP_LEGEND[heatmap].gradient }} />
-              <div className="mt-0.5 flex justify-between text-[10px] text-slate-400">
-                <span>{HEATMAP_LEGEND[heatmap].lo}</span>
-                <span>{HEATMAP_LEGEND[heatmap].label}</span>
-                <span>{HEATMAP_LEGEND[heatmap].hi}</span>
+        <Section title="Floor map">
+          <Row
+            icon={
+              <IconTile color="slate">
+                <Layers size={16} />
+              </IconTile>
+            }
+            title="Colour the floor by"
+            divider={false}
+          >
+            <Segmented<HeatmapMode>
+              value={heatmap}
+              onChange={setHeatmap}
+              options={[
+                { id: 'none', label: 'Off' },
+                { id: 'germ', label: 'Germs' },
+                { id: 'heat', label: 'Heat' },
+                { id: 'ammonia', label: 'NH₃' },
+              ]}
+            />
+            {heatmap !== 'none' && (
+              <div className="mt-2.5">
+                <div className="h-1.5 rounded-full" style={{ background: HEATMAP_LEGEND[heatmap].gradient }} />
+                <div className="mt-1 flex justify-between text-[11.5px] text-slate-500">
+                  <span>{HEATMAP_LEGEND[heatmap].lo}</span>
+                  <span>{HEATMAP_LEGEND[heatmap].label}</span>
+                  <span>{HEATMAP_LEGEND[heatmap].hi}</span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </Row>
         </Section>
       </div>
     </div>
