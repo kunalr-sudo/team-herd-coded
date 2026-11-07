@@ -1,6 +1,6 @@
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { useMemo, useRef, useState } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { DayNightRig, Grass, Ground, Trees } from './Environment'
 import SceneHtml from './SceneHtml'
@@ -15,41 +15,145 @@ const PASTURE_EXCLUDE = { x0: -5, x1: 5, z0: -21, z1: -11.5 }
 
 type Mode = 'walk' | 'graze' | 'idle'
 
-function PastureCows({ onMoo }: { onMoo?: (cow: number, x: number) => void }) {
+const PLAYER = N_COWS // extra instance used when you play as a cow
+const JERSEY = new THREE.Color(0.86, 0.62, 0.4)
+const HOLSTEIN = new THREE.Color(0.96, 0.96, 0.94)
+const FENCE_LIMIT = FIELD_R + 1.3
+
+export interface PastureControls {
+  /** Called whenever a cow moos; `pan` is -1 (left) .. 1 (right) for stereo. */
+  onMoo?: (pan: number) => void
+  /** When true, you drive the player cow (W/A/S/D, Shift, M) and the camera follows it. */
+  playing?: boolean
+  onExitPlay?: () => void
+}
+
+function PastureCows({ onMoo, playing = false, onExitPlay }: PastureControls) {
   const mesh = useRef<THREE.InstancedMesh>(null)
-  const anchor = useRef<THREE.Group>(null)
-  const geometry = useMemo(() => makeCowGeometry(N_COWS, 7), [])
+  const anchors = useRef<(THREE.Group | null)[]>([])
+  const geometry = useMemo(() => makeCowGeometry(N_COWS + 1, 7), [])
   const material = useMemo(() => makeCowMaterial(), [])
-  const [moo, setMoo] = useState<{ cow: number; key: number } | null>(null)
+  const [mooing, setMooing] = useState<Record<number, number>>({})
+  const camera = useThree((s) => s.camera)
+  const keys = useRef(new Set<string>())
 
   const sim = useMemo(() => {
     const rnd = seededRandom(21)
     const cows = Array.from({ length: N_COWS }, () => {
       const r = Math.sqrt(rnd()) * FIELD_R * 0.8
       const a = rnd() * Math.PI * 2
-      return {
-        x: Math.cos(a) * r,
-        z: Math.sin(a) * r,
-        heading: rnd() * Math.PI * 2,
-        tx: 0,
-        tz: 0,
-        mode: 'graze' as Mode,
-        timer: rnd() * 4,
-        pitch: 0,
-        phase: rnd() * 10,
-      }
+      return { x: Math.cos(a) * r, z: Math.sin(a) * r, heading: rnd() * Math.PI * 2, tx: 0, tz: 0, mode: 'graze' as Mode, timer: rnd() * 4, pitch: 0, phase: rnd() * 10 }
     })
-    return { cows, rnd, nextMoo: 2.5, mooCow: -1, mooUntil: 0 }
+    const player = { x: 0, z: FIELD_R * 0.7, heading: Math.PI, speed: 0, pitch: 0 }
+    return { cows, rnd, player, replies: [] as { cow: number; at: number }[], clock: 0 }
   }, [])
 
-  const tmp = useMemo(() => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler(0, 0, 0, 'YXZ'), p: new THREE.Vector3(), s: new THREE.Vector3(COW_SCALE, COW_SCALE, COW_SCALE), c: new THREE.Color(0.96, 0.96, 0.94) }), [])
+  const tmp = useMemo(
+    () => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler(0, 0, 0, 'YXZ'), p: new THREE.Vector3(), s: new THREE.Vector3(COW_SCALE, COW_SCALE, COW_SCALE), zero: new THREE.Vector3(0, 0, 0), look: new THREE.Vector3(), cam: new THREE.Vector3() }),
+    [],
+  )
+
+  const pos = (i: number) => (i === PLAYER ? sim.player : sim.cows[i])
+  const moo = (i: number) => {
+    const c = pos(i)
+    const stamp = performance.now()
+    setMooing((m) => ({ ...m, [i]: stamp }))
+    window.setTimeout(() => setMooing((m) => (m[i] === stamp ? Object.fromEntries(Object.entries(m).filter(([k]) => Number(k) !== i)) : m)), 2400)
+    // Pan relative to the camera so a cow on the left sounds on the left.
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
+    const rel = new THREE.Vector3(c.x, 0, c.z).sub(camera.position)
+    onMoo?.(Math.max(-1, Math.min(1, rel.dot(right) / 8)))
+    if (i < N_COWS) {
+      sim.cows[i].mode = 'idle'
+      sim.cows[i].timer = 2.5
+    }
+  }
+
+  // Keyboard: W/A/S/D or arrows to move, Shift to run, M to moo, Esc to stop playing.
+  useEffect(() => {
+    if (!playing) return
+    const held = keys.current
+    const down = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase()
+      if (k === 'escape') return onExitPlay?.()
+      if (k === 'm' && !e.repeat) {
+        moo(PLAYER)
+        // Nearby cows sometimes moo back.
+        sim.cows.forEach((c, i) => {
+          const d = Math.hypot(c.x - sim.player.x, c.z - sim.player.z)
+          if (d < 7 && sim.rnd() < 0.45) sim.replies.push({ cow: i, at: sim.clock + 0.6 + sim.rnd() * 1.2 })
+        })
+      }
+      if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(k)) {
+        e.preventDefault()
+        held.add(k)
+      }
+    }
+    const up = (e: KeyboardEvent) => held.delete(e.key.toLowerCase())
+    const blur = () => held.clear()
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    window.addEventListener('blur', blur)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', blur)
+      held.clear()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers read live refs
+  }, [playing])
 
   useFrame(({ clock }, rawDt) => {
     const m = mesh.current
     if (!m) return
     const dt = Math.min(rawDt, 0.05)
     const t = clock.elapsedTime
-    const { cows, rnd } = sim
+    sim.clock = t
+    const { cows, rnd, player } = sim
+
+    // --- Player cow (tank controls).
+    if (playing) {
+      const k = keys.current
+      const turn = (k.has('a') || k.has('arrowleft') ? 1 : 0) - (k.has('d') || k.has('arrowright') ? 1 : 0)
+      const thrust = (k.has('w') || k.has('arrowup') ? 1 : 0) - (k.has('s') || k.has('arrowdown') ? 0.55 : 0)
+      const run = k.has('shift') ? 1.9 : 1
+      player.heading += turn * 2.2 * dt
+      const target = thrust * 2.6 * run
+      player.speed += (target - player.speed) * (1 - Math.exp(-dt * 8))
+      player.x += Math.sin(player.heading) * player.speed * dt
+      player.z += Math.cos(player.heading) * player.speed * dt
+      const r = Math.hypot(player.x, player.z)
+      if (r > FENCE_LIMIT) {
+        player.x *= FENCE_LIMIT / r
+        player.z *= FENCE_LIMIT / r
+      }
+      // Cows step aside instead of overlapping.
+      cows.forEach((c) => {
+        const dx = c.x - player.x
+        const dz = c.z - player.z
+        const d = Math.hypot(dx, dz)
+        if (d < 1.6 && d > 1e-3) {
+          c.x += (dx / d) * (1.6 - d) * 0.5
+          c.z += (dz / d) * (1.6 - d) * 0.5
+        }
+      })
+      const bob = Math.abs(player.speed) > 0.2 ? Math.abs(Math.sin(t * 7)) * 0.05 : 0
+      tmp.p.set(player.x, bob, player.z)
+      tmp.e.set(0, player.heading, 0)
+      tmp.q.setFromEuler(tmp.e)
+      tmp.m.compose(tmp.p, tmp.q, tmp.s)
+      // Third-person camera: eases toward a point behind and above the cow.
+      tmp.cam.set(player.x - Math.sin(player.heading) * 8, 4.6, player.z - Math.cos(player.heading) * 8)
+      camera.position.lerp(tmp.cam, 1 - Math.exp(-dt * 3.2))
+      tmp.look.set(player.x, 1.2, player.z)
+      camera.lookAt(tmp.look)
+    } else {
+      tmp.m.compose(tmp.p.set(0, -50, 0), tmp.q.identity(), tmp.zero)
+    }
+    m.setMatrixAt(PLAYER, tmp.m)
+    m.setColorAt(PLAYER, JERSEY)
+
+    // --- Herd: wander, graze, idle.
     cows.forEach((c, i) => {
       c.timer -= dt
       if (c.timer <= 0) {
@@ -66,8 +170,7 @@ function PastureCows({ onMoo }: { onMoo?: (cow: number, x: number) => void }) {
       if (c.mode === 'walk') {
         const dx = c.tx - c.x
         const dz = c.tz - c.z
-        const dist = Math.hypot(dx, dz)
-        if (dist < 0.3) c.mode = 'graze'
+        if (Math.hypot(dx, dz) < 0.3) c.mode = 'graze'
         else {
           let dh = Math.atan2(dx, dz) - c.heading
           dh = Math.atan2(Math.sin(dh), Math.cos(dh))
@@ -77,46 +180,70 @@ function PastureCows({ onMoo }: { onMoo?: (cow: number, x: number) => void }) {
           c.z += Math.cos(c.heading) * speed * dt
         }
       }
-      const targetPitch = c.mode === 'graze' ? 0.16 : 0
-      c.pitch += (targetPitch - c.pitch) * Math.min(1, dt * 2)
+      c.pitch += ((c.mode === 'graze' ? 0.16 : 0) - c.pitch) * Math.min(1, dt * 2)
       const bob = c.mode === 'walk' ? Math.abs(Math.sin(t * 5 + c.phase)) * 0.04 : 0
       tmp.p.set(c.x, bob, c.z)
       tmp.e.set(c.pitch, c.heading, 0)
       tmp.q.setFromEuler(tmp.e)
       tmp.m.compose(tmp.p, tmp.q, tmp.s)
       m.setMatrixAt(i, tmp.m)
-      m.setColorAt(i, tmp.c)
+      m.setColorAt(i, HOLSTEIN)
     })
     m.instanceMatrix.needsUpdate = true
     if (m.instanceColor) m.instanceColor.needsUpdate = true
 
-    if (t > sim.nextMoo) {
-      const cow = Math.floor(rnd() * N_COWS)
-      sim.nextMoo = t + 4 + rnd() * 8
-      sim.mooCow = cow
-      setMoo({ cow, key: t })
-      onMoo?.(cow, cows[cow].x / FIELD_R)
-      cows[cow].mode = 'idle'
-      cows[cow].timer = 2.5
+    // Replies to the player's moo.
+    if (sim.replies.length) {
+      const due = sim.replies.filter((r) => r.at <= t)
+      sim.replies = sim.replies.filter((r) => r.at > t)
+      due.forEach((r) => moo(r.cow))
     }
-    if (anchor.current && sim.mooCow >= 0) {
-      const c = cows[sim.mooCow]
-      anchor.current.position.set(c.x + Math.sin(c.heading) * 0.8, 1.9, c.z + Math.cos(c.heading) * 0.8)
-    }
+
+    // Keep speech bubbles above their cow's head.
+    anchors.current.forEach((g, i) => {
+      if (!g) return
+      const c = pos(i)
+      g.position.set(c.x + Math.sin(c.heading) * 0.8, 1.9, c.z + Math.cos(c.heading) * 0.8)
+    })
   })
 
   return (
     <>
-      <instancedMesh ref={mesh} args={[geometry, material, N_COWS]} frustumCulled={false} />
-      <group ref={anchor}>
-        {moo && (
-          <SceneHtml key={moo.key} center style={{ pointerEvents: 'none' }}>
-            <div className="animate-[floatUp_2.4s_ease-out_forwards] rounded-2xl bg-white px-3 py-1 text-[15px] font-black text-slate-800 shadow-lg">
-              Moo! 🐮
-            </div>
-          </SceneHtml>
-        )}
-      </group>
+      <instancedMesh
+        ref={mesh}
+        args={[geometry, material, N_COWS + 1]}
+        frustumCulled={false}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (e.instanceId !== undefined) moo(e.instanceId)
+        }}
+        onPointerOver={() => (document.body.style.cursor = 'pointer')}
+        onPointerOut={() => (document.body.style.cursor = '')}
+      />
+      {Array.from({ length: N_COWS + 1 }, (_, i) => (
+        <group
+          key={i}
+          ref={(g) => {
+            anchors.current[i] = g
+          }}
+        >
+          {mooing[i] && (
+            <SceneHtml key={mooing[i]} center style={{ pointerEvents: 'none' }}>
+              <div className="animate-[floatUp_2.4s_ease-out_forwards] rounded-2xl bg-white px-3 py-1 text-[15px] font-black whitespace-nowrap text-slate-800 shadow-lg">
+                {i === PLAYER ? 'Moo! (you)' : 'Moo!'}
+              </div>
+            </SceneHtml>
+          )}
+          {i === PLAYER && playing && !mooing[i] && (
+            <SceneHtml center position={[0, 0.2, 0]} style={{ pointerEvents: 'none' }}>
+              <div className="flex flex-col items-center text-[12px] font-bold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+                You
+                <span className="-mt-1 text-[14px]">▾</span>
+              </div>
+            </SceneHtml>
+          )}
+        </group>
+      ))}
     </>
   )
 }
@@ -249,7 +376,13 @@ function Clouds() {
   )
 }
 
-export default function PastureScene({ night = false, onMoo, autoRotate = true }: { night?: boolean; onMoo?: (cow: number, pan: number) => void; autoRotate?: boolean }) {
+export default function PastureScene({
+  night = false,
+  onMoo,
+  autoRotate = true,
+  playing = false,
+  onExitPlay,
+}: PastureControls & { night?: boolean; autoRotate?: boolean }) {
   const [overlayEl, setOverlayEl] = useState<HTMLDivElement | null>(null)
   const overlay = useMemo(() => (overlayEl ? { current: overlayEl } : undefined), [overlayEl])
   return (
@@ -257,7 +390,16 @@ export default function PastureScene({ night = false, onMoo, autoRotate = true }
       {overlay && (
         <Canvas dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}>
           <PerspectiveCamera makeDefault position={[0, 7.5, 19]} fov={42} />
-          <OrbitControls target={[0, 1, -1]} autoRotate={autoRotate} autoRotateSpeed={0.25} enablePan={false} minDistance={10} maxDistance={34} maxPolarAngle={1.35} />
+          <OrbitControls
+            enabled={!playing}
+            target={[0, 1, -1]}
+            autoRotate={autoRotate && !playing}
+            autoRotateSpeed={0.25}
+            enablePan={false}
+            minDistance={10}
+            maxDistance={34}
+            maxPolarAngle={1.35}
+          />
           <DayNightRig daylight={night ? 0 : 1} hourOfDay={night ? 1 : 15} lamps={night ? [[0, 3.6, -12.6]] : []} />
           <Ground size={260} color="#5b8f3a" />
           <Grass count={2600} radius={60} exclude={PASTURE_EXCLUDE} seed={4} />
@@ -267,7 +409,7 @@ export default function PastureScene({ night = false, onMoo, autoRotate = true }
           {!night && <Birds />}
           {!night && <Clouds />}
           <OverlayContext.Provider value={overlay}>
-            <PastureCows onMoo={onMoo} />
+            <PastureCows onMoo={onMoo} playing={playing} onExitPlay={onExitPlay} />
           </OverlayContext.Provider>
         </Canvas>
       )}

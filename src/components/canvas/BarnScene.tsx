@@ -251,7 +251,7 @@ function Fan({ id, z, strength, status }: { id: string; z: number; strength: num
   const badge = {
     failed: { text: `FAN ${id} FAILED`, cls: 'bg-red-600/90 text-white animate-pulse' },
     portable: { text: `FAN ${id} · PORTABLE`, cls: 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/50' },
-    boosted: { text: `FAN ${id} +25%`, cls: 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/50' },
+    boosted: { text: `FAN ${id} +${Math.round((strength - 1) * 100)}%`, cls: 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/50' },
     normal: { text: `FAN ${id}`, cls: 'bg-slate-800/80 text-slate-300' },
   }[status]
   return (

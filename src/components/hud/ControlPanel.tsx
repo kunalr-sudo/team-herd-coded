@@ -5,7 +5,7 @@ import type { AbxStrategy } from '../../sim/cattleEngine'
 import { penList } from '../../sim/narrative'
 import { useSim, type HeatmapMode } from '../../store/useSimulationStore'
 import { HEATMAP_LEGEND } from '../canvas/heatmapLegend'
-import { IconTile, Row, Segmented, Switch } from '../ui/controls'
+import { IconTile, Row, Segmented, StepSlider, Switch } from '../ui/controls'
 
 function Section({ title, footer, children }: { title: string; footer?: string; children: ReactNode }) {
   return (
@@ -148,10 +148,12 @@ export default function ControlPanel() {
                 <Wind size={16} />
               </IconTile>
             }
-            title="Boost fans +25%"
-            trailing={<Switch on={plan.boostVent} onChange={(v) => setPlan({ boostVent: v })} label="Boost fans" />}
-            onClick={() => setPlan({ boostVent: !plan.boostVent })}
-          />
+            title="Boost fans"
+            subtitle="Extra speed on the working fans"
+            trailing={<span className="text-[15px] font-semibold tabular-nums text-white">{plan.fanBoostPct ? `+${plan.fanBoostPct}%` : 'Off'}</span>}
+          >
+            <StepSlider value={plan.fanBoostPct} onChange={(v) => setPlan({ fanBoostPct: v })} label="Boost fans" color="#38bdf8" />
+          </Row>
           <Row
             icon={
               <IconTile color="teal">
@@ -170,10 +172,12 @@ export default function ControlPanel() {
               </IconTile>
             }
             title="Cooling misters"
-            trailing={<Switch on={plan.misters} onChange={(v) => setPlan({ misters: v })} label="Cooling misters" />}
-            onClick={() => setPlan({ misters: !plan.misters })}
+            subtitle="Evaporative cooling at the inlets"
+            trailing={<span className="text-[15px] font-semibold tabular-nums text-white">{plan.misterPct ? `${plan.misterPct}%` : 'Off'}</span>}
             divider={false}
-          />
+          >
+            <StepSlider value={plan.misterPct} onChange={(v) => setPlan({ misterPct: v })} label="Cooling misters" color="#22d3ee" />
+          </Row>
         </Section>
 
         <Section title="When to act" footer={`BarnTwin spots the hidden spread by Hour ${TIMELINE.defaultActionHour}. Farmers usually notice about 48 hours later.`}>

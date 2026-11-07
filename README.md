@@ -27,10 +27,10 @@ No backend, no API keys. Everything (physics, epidemiology, economics, rendering
 | Route | Page |
 |---|---|
 | `#/` | **Landing page.** Explains what BarnTwin does and shows live results from the model. The background is the animated pasture. |
-| `#/simulate` | **Setup wizard.** The live barn stays dimmed in the background.<br>**1 · Crisis:** type a sentence into **Smart translate** (e.g. "104°F and the middle fan broke"). It shows how it reads the sentence as you type, and pressing Return applies it to the heatwave slider and Fan B switch. You can also set those controls directly.<br>**2 · Response:** choose *BarnTwin plan* (recommended), *Do nothing*, or *Customize* (switches, an antibiotic selector, and when to act). The 7-day outcome updates instantly.<br>**3 · Start simulation.** |
+| `#/simulate` | **Setup wizard.** The live barn stays dimmed in the background.<br>**1 · Crisis:** type a sentence into **Smart translate** (e.g. "104°F and the middle fan broke"). It shows how it reads the sentence as you type, and pressing Return applies it to the heatwave slider and Fan B switch. You can also set those controls directly.<br>**2 · Response:** choose *BarnTwin plan* (recommended), *Do nothing*, or *Customize* (switches for isolation and airflow rebalancing, 0–100% sliders in steps of 10 for fan boost and mister intensity, an antibiotic selector, and when to act). The 7-day outcome updates instantly.<br>**3 · Start simulation.** |
 | `#/run` | **Clean run page.** Only the barn, the story banner, the X-Ray toggle, a projection button and the timeline, with no control parameters. Playback starts from Hour 0. At the end of the week a summary card offers *See full projection*, *Try another response* or *Replay*. |
 | `#/lab` | **Expert view.** The 4-step guided demo presets plus every control and the BarnTwin AI panel on one screen. |
-| `#/pasture` | **Pasture mode.** Grazing Holsteins with moos. Birdsong plays by day and crickets by night (day/night toggle). Click *Turn on moos & birdsong*; browsers need a click before playing audio. |
+| `#/pasture` | **Pasture mode.** Grazing Holsteins with birdsong by default, crickets at night, and a Day/Night toggle. **Click any cow to hear it moo.** **Play as a cow:** W/S walk, A/D turn, Shift runs, M moos (nearby cows sometimes answer), Esc stops. The camera follows you and the herd steps aside. If the browser hasn't allowed audio yet, the first click or key press starts it. |
 
 Smart translate (`src/sim/scenarioParser.ts`) is a local, rule-based parser, not an LLM or other AI model. Nothing leaves the browser. It extracts what the model can simulate: the heatwave peak (°C or °F, or words like "scorching"), whether a fan fails, and whether all fans are healthy. It tells you when it converts, clamps or remaps a value.
 
@@ -99,8 +99,8 @@ Drag the timeline at any point. The story banner, pen cards, cows, wind streaks 
 - **Common random numbers.** Each cow gets a fixed infection threshold, incubation length, and clinical, mortality and chronic draws. Every scenario uses the same herd with the same luck, so differences between trajectories come only from physics and interventions.
 - **Interventions** take effect at the action hour (default **Hour 30**):
   - **Isolation.** Fever detection moves each visibly sick cow to the Hospital Pen right away. That shifts its germ source next to the exhaust and lowers its mortality.
-  - **Ventilation.** +25% fans; rebalancing closes the baffles and adds a portable fan at B.
-  - **Misters.**
+  - **Ventilation.** Fan boost from 0 to +100% on the working fans; the BarnTwin plan and the naive fix both use +25%. Rebalancing closes the baffles and adds a portable fan at B.
+  - **Misters.** Intensity from 0 to 100%; cooling, added humidity and the soaking credit scale with it.
   - **Antibiotics:**
     - *Reactive:* treat cows once visibly sick (farmer notices after 12 h).
     - *Whole-barn blanket:* 160 doses.

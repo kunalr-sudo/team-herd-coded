@@ -91,15 +91,28 @@ class PastureAudio {
     return { ctx: this.ctx, master: this.master! }
   }
 
-  /** Must be called from a user gesture (browser autoplay rules). */
+  /**
+   * Starts the soundscape. If the browser hasn't allowed audio yet (no user interaction),
+   * everything is scheduled silently and becomes audible after `unlock()` on the first gesture.
+   */
   async enable() {
     const { ctx } = this.ensure()
-    await ctx.resume()
+    void ctx.resume()
     await this.loadClips()
+    if (this.enabled) return
     this.enabled = true
     this.startBreeze()
     this.scheduleBirds()
     if (this.night) this.startCrickets()
+  }
+
+  /** Resume audio from inside a user gesture. */
+  unlock() {
+    if (this.enabled) void this.ctx?.resume()
+  }
+
+  get running() {
+    return this.ctx?.state === 'running'
   }
 
   disable() {

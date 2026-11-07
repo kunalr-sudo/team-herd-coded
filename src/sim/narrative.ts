@@ -128,7 +128,7 @@ export function buildStory(
     const dT = avgTHI(base) - avgTHI(fr)
     if (hour < actionHour + 30 || t.sick < 10)
       return {
-        headline: `${h} Fans cranked +25% ${dT >= 1.5 ? 'cool' : 'barely cool'} the barn (THI −${dT.toFixed(1)}), but sick cows stay put and the faster swirl pushes Pen 3's germs downwind${
+        headline: `${h} Fans cranked +${cur.config.fanBoostPct}% ${dT >= 1.5 ? 'cool' : 'barely cool'} the barn (THI −${dT.toFixed(1)}), but sick cows stay put and the faster swirl pushes Pen 3's germs downwind${
           pushed.length ? ` into ${penList(pushed)}` : ''
         }.`,
         tone: 'danger',
