@@ -1,8 +1,9 @@
-import { Moon, Pause, Play, Sun, SunMoon, Thermometer } from 'lucide-react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { Moon, Pause, Play, Sun } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { HOURS, TIMELINE, hourLabel } from '../../sim/constants'
 import { daylightFactor, daylightFor, type LightingMode } from '../../sim/daylight'
-import { useSim } from '../../store/useSimulationStore'
+import { SPEEDS, useSim } from '../../store/useSimulationStore'
+import { Segmented } from '../ui/controls'
 
 export default function TimelineBar({ presetKeys = false }: { presetKeys?: boolean }) {
   const hour = useSim((s) => s.hour)
@@ -10,7 +11,7 @@ export default function TimelineBar({ presetKeys = false }: { presetKeys?: boole
   const speed = useSim((s) => s.speed)
   const setHour = useSim((s) => s.setHour)
   const togglePlay = useSim((s) => s.togglePlay)
-  const cycleSpeed = useSim((s) => s.cycleSpeed)
+  const setSpeed = useSim((s) => s.setSpeed)
   const actionHour = useSim((s) => s.plan.actionHour)
   const fault = useSim((s) => s.crisis.fanBFault)
   const peakHour = useSim((s) => s.bundle.doNothing.summary.peakSickHour)
@@ -58,66 +59,52 @@ export default function TimelineBar({ presetKeys = false }: { presetKeys?: boole
   const dayNight = `linear-gradient(90deg, ${Array.from({ length: 29 }, (_, k) => {
     const h = (k / 28) * HOURS
     const d = daylightFactor(h % 24)
-    return `rgba(${Math.round(30 + 200 * d)}, ${Math.round(41 + 170 * d)}, ${Math.round(80 + 80 * d)}, 0.55) ${((h / HOURS) * 100).toFixed(1)}%`
+    return `rgba(${Math.round(40 + 150 * d)}, ${Math.round(52 + 150 * d)}, ${Math.round(90 + 120 * d)}, ${(0.35 + 0.25 * d).toFixed(2)}) ${((h / HOURS) * 100).toFixed(1)}%`
   }).join(', ')})`
-  const lightModes: { id: LightingMode; icon: ReactNode; title: string }[] = [
-    { id: 'auto', icon: <SunMoon size={14} />, title: 'Follow the simulation clock (sunlight → moonlight)' },
-    { id: 'day', icon: <Sun size={14} />, title: 'Always daytime' },
-    { id: 'night', icon: <Moon size={14} />, title: 'Always night' },
-  ]
-  // Labels extend away from their neighbours so the early markers never overlap.
   const markers: { h: number; label: string; color: string; align: 'left' | 'right' }[] = [
-    ...(fault ? [{ h: TIMELINE.crisisHour, label: 'Fan B fails', color: '#ef4444', align: 'left' as const }] : []),
-    { h: actionHour, label: 'BarnTwin acts', color: '#22d3ee', align: 'right' },
-    { h: peakHour, label: 'Outbreak peak (no action)', color: '#f97316', align: peakHour > 120 ? 'left' : 'right' },
+    ...(fault ? [{ h: TIMELINE.crisisHour, label: 'Fan B fails', color: '#f87171', align: 'left' as const }] : []),
+    { h: actionHour, label: 'BarnTwin acts', color: '#67e8f9', align: 'right' },
+    { h: peakHour, label: 'Peak if nobody acts', color: '#fdba74', align: peakHour > 120 ? 'left' : 'right' },
   ]
+  const isDay = daylight > 0.3
 
   return (
-    <div className="panel pointer-events-auto absolute inset-x-3 bottom-3 z-10 flex items-center gap-3 px-3 py-2.5">
+    <div className="panel pointer-events-auto absolute inset-x-3 bottom-3 z-10 flex items-center gap-4 px-4 py-3">
       <button
         type="button"
         onClick={togglePlay}
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-cyan-400 text-slate-950 shadow-[0_0_16px_rgba(34,211,238,0.5)] hover:bg-cyan-300"
+        className="press grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-slate-950 shadow-[0_6px_20px_-6px_rgba(255,255,255,0.5)] hover:bg-slate-100"
         aria-label={playing ? 'Pause' : 'Play'}
       >
-        {playing ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
+        {playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
       </button>
-      <button
-        type="button"
-        onClick={cycleSpeed}
-        className="shrink-0 rounded-md border border-slate-600/70 px-2 py-1 font-mono text-[11px] text-slate-300 hover:border-slate-400"
-        title="Simulated hours per second"
-      >
-        {speed}h/s
-      </button>
-      <div
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors duration-700"
-        style={{ background: daylight > 0.3 ? `rgba(253, 224, 71, ${0.25 + 0.5 * daylight})` : 'rgba(129, 140, 248, 0.25)' }}
-        title={daylight > 0.3 ? 'Daytime' : 'Night'}
-      >
-        {daylight > 0.3 ? <Sun size={20} className="text-yellow-200" /> : <Moon size={18} className="text-indigo-200" />}
-      </div>
-      <div className="w-[170px] shrink-0 whitespace-nowrap leading-tight">
-        <div className="font-mono text-[18px] font-bold text-slate-50">Hour {hour}</div>
-        <div className="flex items-center gap-1 text-[11px] text-slate-400">
-          {hourLabel(hour)} · <Thermometer size={11} /> {weather.tempC.toFixed(0)}°C outside
+
+      <div className="w-[150px] shrink-0 leading-tight">
+        <div className="flex items-center gap-1.5 text-[17px] font-semibold tracking-tight text-white">
+          {isDay ? <Sun size={16} className="text-amber-300" /> : <Moon size={15} className="text-indigo-300" />}
+          {hourLabel(hour)}
+        </div>
+        <div className="mt-0.5 text-[12px] text-slate-400">
+          Hour {hour} of {HOURS} · {weather.tempC.toFixed(0)}°C
         </div>
       </div>
-      <div className="relative flex-1 pt-4 pb-4">
-        <div className="pointer-events-none absolute inset-x-0 top-[19px] h-3.5 rounded" style={{ background: dayNight }} />
+
+      <div className="relative min-w-0 flex-1 pt-3.5 pb-4">
         <div
-          className="absolute top-[22px] h-2 rounded bg-yellow-400/15 border border-yellow-400/25"
-          style={{ left: pct(TIMELINE.hiddenSpreadStart), width: pct(TIMELINE.hiddenSpreadEnd - TIMELINE.hiddenSpreadStart) }}
-          title="Hidden spread window — infected cattle look healthy"
-        />
-        <div
-          className="pointer-events-none absolute top-0 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold text-yellow-300/85"
+          className="pointer-events-none absolute -translate-x-1/2 top-0 whitespace-nowrap text-[11px] font-medium text-amber-200/80"
           style={{ left: pct((TIMELINE.hiddenSpreadStart + TIMELINE.hiddenSpreadEnd) / 2) }}
         >
-          Hidden spread window
+          Hidden spread
         </div>
-        {[24, 48, 72, 96, 120, 144].map((h) => (
-          <div key={h} className="pointer-events-none absolute top-[18px] h-4 w-px bg-slate-500/40" style={{ left: pct(h) }} />
+        <div className="pointer-events-none absolute inset-x-0 top-[24px] h-2 overflow-hidden rounded-full" style={{ background: dayNight }}>
+          <div className="absolute inset-y-0 left-0 bg-cyan-300/70" style={{ width: pct(hour) }} />
+          <div
+            className="absolute inset-y-0 bg-amber-300/35"
+            style={{ left: pct(TIMELINE.hiddenSpreadStart), width: pct(TIMELINE.hiddenSpreadEnd - TIMELINE.hiddenSpreadStart) }}
+          />
+        </div>
+        {markers.map((m) => (
+          <span key={`dot-${m.label}`} className="pointer-events-none absolute top-[25px] h-1.5 w-1.5 -translate-x-1/2 rounded-full" style={{ left: pct(m.h), background: m.color }} />
         ))}
         <input
           type="range"
@@ -125,35 +112,44 @@ export default function TimelineBar({ presetKeys = false }: { presetKeys?: boole
           max={HOURS}
           value={hour}
           onChange={(e) => setHour(Number(e.target.value))}
-          className="timeline relative z-10 w-full"
+          className="scrubber relative z-10 mt-[3px]"
           aria-label="Simulation hour"
+          aria-valuetext={`${hourLabel(hour)}, hour ${hour}`}
         />
         {markers.map((m) => (
           <button
             type="button"
             key={m.label}
             onClick={() => setHour(m.h)}
-            className={`absolute bottom-0 z-20 whitespace-nowrap text-[10px] font-semibold hover:underline ${
-              m.align === 'left' ? '-translate-x-full' : ''
-            }`}
+            className={`absolute bottom-0 z-20 whitespace-nowrap text-[11px] font-medium opacity-90 hover:opacity-100 ${m.align === 'left' ? '-translate-x-full pr-1' : 'pl-1'}`}
             style={{ left: pct(m.h), color: m.color }}
           >
-            {m.align === 'left' ? `${m.label} ▲` : `▲ ${m.label}`}
+            {m.label}
           </button>
         ))}
       </div>
-      <div className="flex shrink-0 rounded-lg border border-slate-600/60 p-0.5" title="Lighting">
-        {lightModes.map((m) => (
-          <button
-            type="button"
-            key={m.id}
-            onClick={() => setLighting(m.id)}
-            title={m.title}
-            className={`rounded-md px-2 py-1.5 ${lighting === m.id ? 'bg-slate-200 text-slate-900' : 'text-slate-400 hover:text-white'}`}
-          >
-            {m.icon}
-          </button>
-        ))}
+
+      <div className="w-[176px] shrink-0">
+        <Segmented
+          value={String(speed)}
+          onChange={(v) => setSpeed(Number(v) as (typeof SPEEDS)[number])}
+          options={[
+            { id: '2', label: 'Slow' },
+            { id: '6', label: 'Normal' },
+            { id: '12', label: 'Fast' },
+          ]}
+        />
+      </div>
+      <div className="w-[118px] shrink-0" title="Lighting: follow the clock, always day, or always night">
+        <Segmented<LightingMode>
+          value={lighting}
+          onChange={setLighting}
+          options={[
+            { id: 'auto', label: 'Auto' },
+            { id: 'day', label: '☀︎' },
+            { id: 'night', label: '☾' },
+          ]}
+        />
       </div>
     </div>
   )

@@ -40,6 +40,7 @@ interface SimState {
   advance: (dh: number) => void
   togglePlay: () => void
   cycleSpeed: () => void
+  setSpeed: (s: (typeof SPEEDS)[number]) => void
   setXray: (on: boolean) => void
   setHeatmap: (m: HeatmapMode) => void
   selectPen: (p: number | null) => void
@@ -97,6 +98,7 @@ export const useSim = create<SimState>((set, get) => ({
     const i = SPEEDS.indexOf(get().speed)
     set({ speed: SPEEDS[(i + 1) % SPEEDS.length] })
   },
+  setSpeed: (speed) => set({ speed }),
   setXray: (on) => set({ xray: on, heatmap: !on && get().heatmap === 'germ' ? 'heat' : get().heatmap }),
   setHeatmap: (m) => set({ heatmap: m, xray: m === 'germ' ? true : get().xray }),
   selectPen: (p) => set({ selectedPen: p }),

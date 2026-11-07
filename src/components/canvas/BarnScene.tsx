@@ -29,7 +29,7 @@ function IsoCamera({ sidePanels }: { sidePanels: boolean }) {
   useEffect(() => {
     if (!ref.current) return
     // Leave room for the side HUD panels.
-    const usableW = Math.max(400, size.width - (sidePanels ? 640 : 120))
+    const usableW = Math.max(400, size.width - (sidePanels ? 700 : 120))
     ref.current.zoom = Math.min(usableW / 28, (size.height - (sidePanels ? 250 : 200)) / 22)
     ref.current.updateProjectionMatrix()
   }, [size, sidePanels])

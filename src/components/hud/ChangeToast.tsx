@@ -13,7 +13,7 @@ export default function ChangeToast() {
   return (
     <div
       key={changedAt}
-      className="pointer-events-none absolute bottom-[132px] left-1/2 z-30 flex -translate-x-1/2 animate-[toast_3s_ease-out_forwards] items-center gap-2 rounded-full border border-cyan-400/50 bg-slate-950/90 px-4 py-2 text-[13px] text-slate-100 shadow-xl"
+      className="panel pointer-events-none absolute bottom-[156px] left-1/2 z-30 flex -translate-x-1/2 animate-[toast_3s_ease-out_forwards] items-center gap-2 !rounded-full px-4 py-2 text-[13px] text-slate-100"
     >
       <span className="h-2 w-2 rounded-full bg-cyan-400" />
       Projection updated in {bundle.computeMs.toFixed(1)} ms — {PLAN_NAME[kind]}:{' '}
