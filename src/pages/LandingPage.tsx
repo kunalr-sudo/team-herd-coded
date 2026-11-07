@@ -59,7 +59,7 @@ export default function LandingPage() {
             scrolled ? 'border-b border-white/[0.07] bg-[#0a0d14]/70 backdrop-blur-xl backdrop-saturate-150' : 'border-b border-transparent'
           }`}
         >
-          <div className="mx-auto flex h-[56px] max-w-[1120px] items-center justify-between px-6">
+          <div className="flex h-[56px] items-center justify-between px-6 lg:px-10">
             <a href="#/" className="flex items-center gap-2.5">
               <div className="grid h-8 w-8 place-items-center rounded-[9px] bg-gradient-to-br from-cyan-400 to-emerald-500 text-[15px] font-black text-slate-950">B</div>
               <span className="text-[16px] font-semibold text-white">BarnTwin</span>
@@ -79,8 +79,8 @@ export default function LandingPage() {
         </nav>
 
         {/* Hero: words on the left (solid dark), the live pasture on the right. */}
-        <section className="relative -mt-[56px] grid min-h-[100svh] grid-cols-1 bg-[#05070b] md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-          <div className="relative z-10 flex flex-col justify-center px-6 pt-[104px] pb-14 md:pl-[max(1.5rem,calc((100vw-1120px)/2+1.5rem))] md:pr-12">
+        <section className="relative -mt-[56px] grid min-h-[100svh] grid-cols-1 bg-[#05070b] md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+          <div className="relative z-10 flex flex-col justify-center px-6 pt-[104px] pb-14 lg:pl-10 lg:pr-12">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0, duration: 0.9 }} className="max-w-[560px]">
               <Eyebrow tone="text-emerald-300">A digital twin for cattle barns</Eyebrow>
               <h1 className="mt-3 text-[52px] font-bold leading-[1.02] tracking-[-0.035em] text-white lg:text-[64px]">See the outbreak before the herd does.</h1>
@@ -107,7 +107,7 @@ export default function LandingPage() {
               Scroll to learn more
             </button>
           </div>
-          <div className="relative h-[62vh] p-3 pt-[68px] md:h-auto md:pl-0">
+          <div className="relative h-[62vh] p-3 pt-[68px] md:h-auto md:pl-0 lg:pr-6 lg:pb-6">
             <div className="relative h-full overflow-hidden rounded-[32px] ring-1 ring-white/10">
               <PastureScene />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/35 to-transparent" />

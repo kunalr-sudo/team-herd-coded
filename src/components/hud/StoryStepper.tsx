@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import { Eye, ScanEye } from 'lucide-react'
 import { NAIVE_FIX } from '../../sim/cattleEngine'
 import { buildStory, type Tone } from '../../sim/narrative'
@@ -74,24 +74,23 @@ export function StoryBanner({ className = '' }: { className?: string }) {
   return (
     <div className={`panel flex items-start gap-3 px-4 py-3 ${className}`} aria-live="polite">
       <span className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${TONE_DOT[story.tone]} ${story.tone === 'danger' ? 'animate-pulse' : ''}`} />
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.p
-          key={story.headline}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18 }}
-          className="min-w-0 text-[15px] leading-snug text-slate-100"
-        >
-          {body ? (
-            <>
-              <span className="font-semibold text-white">{lead}.</span> {body}
-            </>
-          ) : (
-            story.headline
-          )}
-        </motion.p>
-      </AnimatePresence>
+      {/* Keyed on the sentence template (numbers stripped): hourly number changes update in place,
+          and only a genuinely new message fades in — no flashing every hour. */}
+      <motion.p
+        key={story.headline.replace(/[\d.,−-]+/g, '#')}
+        initial={{ opacity: 0.25 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+        className="min-w-0 text-[15px] leading-snug text-slate-100 tabular-nums"
+      >
+        {body ? (
+          <>
+            <span className="font-semibold text-white">{lead}.</span> {body}
+          </>
+        ) : (
+          story.headline
+        )}
+      </motion.p>
     </div>
   )
 }
