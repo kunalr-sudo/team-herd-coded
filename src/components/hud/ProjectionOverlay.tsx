@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Pause, Play, X } from 'lucide-react'
 import { useEffect } from 'react'
 import { usd } from '../../sim/advisor'
-import type { ScenarioResult } from '../../sim/cattleEngine'
+import { NAIVE_FIX, type ScenarioResult } from '../../sim/cattleEngine'
 import { HERD_VALUE_USD, hourLabel } from '../../sim/constants'
 import { useSim } from '../../store/useSimulationStore'
 import { SPRING } from '../ui/spring'
@@ -30,7 +30,7 @@ function Body() {
   const base = bundle.doNothing
   const cols: Column[] = [
     { key: 'none', title: 'Do nothing', sub: 'Treat cows once they look sick', r: base, accent: '#f87171' },
-    { key: 'naive', title: 'Naive fan boost', sub: 'Fans +25%, nothing else', r: bundle.naive, accent: '#fbbf24' },
+    { key: 'naive', title: 'Naive fan boost', sub: `Fans +${NAIVE_FIX.fanBoostPct}%, nothing else`, r: bundle.naive, accent: '#fbbf24' },
     { key: 'smart', title: 'BarnTwin plan', sub: 'Isolate · air · cool · target', r: bundle.smart, accent: '#34d399' },
   ]
   if (kind === 'custom') cols.push({ key: 'custom', title: 'Your plan', sub: 'Custom choices', r: bundle.current, accent: '#67e8f9' })

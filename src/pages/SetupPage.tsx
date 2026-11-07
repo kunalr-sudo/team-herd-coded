@@ -2,7 +2,7 @@ import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import { ArrowUp, Check, ChevronDown, ChevronLeft, Dna, Droplets, Fan, Flame, Hospital, Pill, Play, SlidersHorizontal, Sparkles, Timer, Wind, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import BarnScene from '../components/canvas/BarnScene'
-import { AnimatedNumber, IconTile, Row, Segmented, Switch } from '../components/ui/controls'
+import { AnimatedNumber, IconTile, Row, Segmented, StepSlider, Switch } from '../components/ui/controls'
 import { SPRING } from '../components/ui/spring'
 import { NO_INTERVENTION, type AbxStrategy, type InterventionConfig } from '../sim/cattleEngine'
 import { TIMELINE, hourLabel } from '../sim/constants'
@@ -329,9 +329,7 @@ function ResponseStep({ onBack, onStart }: { onBack: () => void; onStart: () => 
               {(
                 [
                   ['isolate', 'Isolate sick cows', 'Move them to the downwind Hospital Pen', Hospital, 'red'],
-                  ['boostVent', 'Boost fans +25%', 'Run the working fans harder', Wind, 'blue'],
                   ['rebalance', 'Rebalance airflow', 'Close Pen 3 baffles, add a portable fan', Fan, 'teal'],
-                  ['misters', 'Cooling misters', 'Evaporative cooling at the inlets', Droplets, 'cyan'],
                 ] as const
               ).map(([key, title, sub, Icon, color]) => (
                 <Row
@@ -346,6 +344,26 @@ function ResponseStep({ onBack, onStart }: { onBack: () => void; onStart: () => 
                   trailing={<Switch on={own[key]} onChange={(v) => updateOwn({ [key]: v })} label={title} />}
                   onClick={() => updateOwn({ [key]: !own[key] })}
                 />
+              ))}
+              {(
+                [
+                  ['fanBoostPct', 'Boost fans', 'Extra speed on the working fans', Wind, 'blue', '#38bdf8', (v: number) => `+${v}%`],
+                  ['misterPct', 'Cooling misters', 'Evaporative cooling at the inlets', Droplets, 'cyan', '#22d3ee', (v: number) => `${v}%`],
+                ] as const
+              ).map(([key, title, sub, Icon, color, fill, fmt]) => (
+                <Row
+                  key={key}
+                  icon={
+                    <IconTile color={color}>
+                      <Icon size={17} />
+                    </IconTile>
+                  }
+                  title={title}
+                  subtitle={sub}
+                  trailing={<span className="text-[15px] font-semibold tabular-nums text-white">{own[key] ? fmt(own[key]) : 'Off'}</span>}
+                >
+                  <StepSlider value={own[key]} onChange={(v) => updateOwn({ [key]: v })} label={title} color={fill} />
+                </Row>
               ))}
               <Row
                 icon={

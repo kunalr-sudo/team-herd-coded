@@ -2,7 +2,7 @@
 // so it is obvious BarnTwin is a disease early-warning system, not just a climate controller.
 
 import { HERD_SIZE, TIMELINE } from './constants'
-import type { CounterfactualBundle, PlanKind } from './cattleEngine'
+import { SMART_PROTOCOL, type CounterfactualBundle, type PlanKind } from './cattleEngine'
 import { penList } from './narrative'
 
 export type AdviceMode = 'monitoring' | 'alert' | 'scheduled' | 'acting'
@@ -42,7 +42,7 @@ export function advise(bundle: CounterfactualBundle, kind: PlanKind, hour: numbe
   const actions = [
     'Move every sick calf to the downwind Hospital Pen',
     'Rebalance airflow: close Pen 3 baffles + portable fan at B',
-    'Boost ventilation +25% and switch on cooling misters',
+    `Boost ventilation +${SMART_PROTOCOL.fanBoostPct}% and switch on cooling misters`,
     `Treat only the exposed pens (${penList(smart.targetedPens)}, ${smart.summary.metaphylaxisDoses} doses — not ${HERD_SIZE})`,
   ]
   const payoff = `${usd(base.cost.total - smart.summary.cost.total)} saved · ${base.clinicalCases} → ${smart.summary.clinicalCases} sick · ${base.deaths} → ${smart.summary.deaths} deaths`

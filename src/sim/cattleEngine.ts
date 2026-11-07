@@ -43,9 +43,11 @@ export interface CrisisConfig {
 
 export interface InterventionConfig {
   isolate: boolean
-  boostVent: boolean
+  /** Extra fan speed on the working fans, 0–100 %. */
+  fanBoostPct: number
   rebalance: boolean
-  misters: boolean
+  /** Cooling mister intensity, 0–100 %. */
+  misterPct: number
   abx: AbxStrategy
   actionHour: number
 }
@@ -54,20 +56,20 @@ export type ScenarioConfig = CrisisConfig & InterventionConfig
 
 export const NO_INTERVENTION: InterventionConfig = {
   isolate: false,
-  boostVent: false,
+  fanBoostPct: 0,
   rebalance: false,
-  misters: false,
+  misterPct: 0,
   abx: 'reactive',
   actionHour: TIMELINE.defaultActionHour,
 }
 
-export const NAIVE_FIX: InterventionConfig = { ...NO_INTERVENTION, boostVent: true }
+export const NAIVE_FIX: InterventionConfig = { ...NO_INTERVENTION, fanBoostPct: 25 }
 
 export const SMART_PROTOCOL: InterventionConfig = {
   isolate: true,
-  boostVent: true,
+  fanBoostPct: 25,
   rebalance: true,
-  misters: true,
+  misterPct: 100,
   abx: 'targeted',
   actionHour: TIMELINE.defaultActionHour,
 }
@@ -241,7 +243,7 @@ function herdResponse(flow: FlowField, nInPen: Float32Array): Float32Array {
 export function ventilationAt(cfg: ScenarioConfig, hour: number): VentConfig {
   const acting = hour >= cfg.actionHour
   const failed = cfg.fanBFault && hour >= TIMELINE.crisisHour
-  const boost = cfg.boostVent && acting ? VENT.boostFactor : 1
+  const boost = acting ? 1 + cfg.fanBoostPct / 100 : 1
   let fanB = failed ? 0 : 1
   const rebalance = cfg.rebalance && acting && failed
   if (rebalance) fanB = VENT.rebalancedFanB
@@ -310,7 +312,8 @@ export function runScenario(cfg: ScenarioConfig): ScenarioResult {
     const vent = ventilationAt(cfg, h)
     const flow = getFlowField(vent)
     const weather = outdoorWeather(h, cfg.heatwaveTemp)
-    const mistersOn = cfg.misters && acting
+    const misterLevel = acting ? cfg.misterPct / 100 : 0
+    const mistersOn = misterLevel > 0
 
     // --- Isolation (BarnTwin fever detection moves sick cattle instantly).
     if (cfg.isolate && acting) {
@@ -331,12 +334,12 @@ export function runScenario(cfg: ScenarioConfig): ScenarioResult {
       shedInPen[loc[c]] += shedding(c, h)
     }
 
-    const inletT = weather.tempC - (mistersOn ? HEAT.misterCoolingC : 0)
-    const inletRH = Math.min(95, weather.rh + (mistersOn ? HEAT.misterRhAdd : 0))
+    const inletT = weather.tempC - HEAT.misterCoolingC * misterLevel
+    const inletRH = Math.min(95, weather.rh + HEAT.misterRhAdd * misterLevel)
     const eIn = (inletRH / 100) * saturationVaporPressureKPa(inletT)
     const solarSrc = (weather.solarWm2 * CELL_M * CELL_M) / HEAT.airRhoCp
     const nh3Temp = Math.pow(AMMONIA.tempCoefficient, weather.tempC - 20)
-    const soak = mistersOn ? HEAT.misterSoakTHI : 0
+    const soak = HEAT.misterSoakTHI * misterLevel
 
     const herd = herdResponse(flow, nInPen)
     aerosol.fill(0)
@@ -640,9 +643,9 @@ export interface CounterfactualBundle {
 
 const sameInterventions = (a: InterventionConfig, b: InterventionConfig) =>
   a.isolate === b.isolate &&
-  a.boostVent === b.boostVent &&
+  a.fanBoostPct === b.fanBoostPct &&
   a.rebalance === b.rebalance &&
-  a.misters === b.misters &&
+  a.misterPct === b.misterPct &&
   a.abx === b.abx &&
   a.actionHour === b.actionHour
 

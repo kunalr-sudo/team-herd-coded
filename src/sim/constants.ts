@@ -86,7 +86,6 @@ export const TIMELINE = {
 export const VENT = {
   /** Design air speed through the barn with all three fans at 100% (m/s). */
   designSpeed: 1.8,
-  boostFactor: 1.25,
   /** Portable fan + closed baffles: effective Fan B replacement after rebalancing. */
   rebalancedFanB: 0.85,
   /** Turbulent eddy diffusivity used by the transport solver (m^2/s). */

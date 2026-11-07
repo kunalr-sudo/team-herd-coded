@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { Eye, ScanEye } from 'lucide-react'
+import { NAIVE_FIX } from '../../sim/cattleEngine'
 import { buildStory, type Tone } from '../../sim/narrative'
 import { useSim, type PresetId } from '../../store/useSimulationStore'
 import { SPRING } from '../ui/spring'
@@ -14,7 +15,7 @@ const TONE_DOT: Record<Tone, string> = {
 const PRESETS: { id: PresetId; title: string; hint: string }[] = [
   { id: 1, title: 'Crisis hits', hint: 'Hour 18 · heatwave + Fan B fails' },
   { id: 2, title: 'Hidden spread', hint: 'Hour 36 · reveal silent infections' },
-  { id: 3, title: 'Naive fix', hint: 'Crank fans +25%, nothing else' },
+  { id: 3, title: 'Naive fix', hint: `Crank fans +${NAIVE_FIX.fanBoostPct}%, nothing else` },
   { id: 4, title: 'BarnTwin fix', hint: 'Isolate · ventilate · cool · target' },
 ]
 

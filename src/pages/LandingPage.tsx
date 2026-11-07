@@ -78,40 +78,44 @@ export default function LandingPage() {
           </div>
         </nav>
 
-        {/* Hero */}
-        <section className="relative -mt-[56px] h-[100svh] min-h-[640px] w-full overflow-hidden">
-          <div className="absolute inset-0">
-            <PastureScene />
-          </div>
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(5,7,11,0.72)_0%,rgba(5,7,11,0.45)_45%,rgba(5,7,11,0.1)_75%)]" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[#05070b]/70 to-transparent" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[#05070b] to-transparent" />
-
-          <div className="pointer-events-none relative flex h-full flex-col items-center justify-center px-6 text-center">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0, duration: 0.9 }}>
+        {/* Hero: words on the left (solid dark), the live pasture on the right. */}
+        <section className="relative -mt-[56px] grid min-h-[100svh] grid-cols-1 bg-[#05070b] md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+          <div className="relative z-10 flex flex-col justify-center px-6 pt-[104px] pb-14 md:pl-[max(1.5rem,calc((100vw-1120px)/2+1.5rem))] md:pr-12">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0, duration: 0.9 }} className="max-w-[560px]">
               <Eyebrow tone="text-emerald-300">A digital twin for cattle barns</Eyebrow>
-              <h1 className="mx-auto mt-3 max-w-[900px] text-[56px] font-bold leading-[1.02] tracking-[-0.035em] text-white md:text-[76px]">See the outbreak before the herd does.</h1>
-              <p className="mx-auto mt-6 max-w-[640px] text-[19px] leading-relaxed text-slate-200 md:text-[21px]">
+              <h1 className="mt-3 text-[52px] font-bold leading-[1.02] tracking-[-0.035em] text-white lg:text-[64px]">See the outbreak before the herd does.</h1>
+              <p className="mt-6 text-[19px] leading-relaxed text-slate-300">
                 BarnTwin models how air, heat and ammonia move through your barn — and predicts where respiratory disease is spreading before any cow looks sick.
               </p>
-              <div className="pointer-events-auto mt-9 flex flex-wrap items-center justify-center gap-5">
+              <div className="mt-9 flex flex-wrap items-center gap-5">
                 <a href="#/simulate" className="press flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-[17px] font-semibold text-slate-950 shadow-[0_10px_40px_-10px_rgba(255,255,255,0.45)] hover:bg-slate-100">
                   <Play size={17} fill="currentColor" /> Try the simulation
                 </a>
-                <a href="#/pasture" className="group flex items-center gap-1 text-[17px] font-medium text-cyan-200 hover:text-white">
+                <a href="#/pasture" className="group flex items-center gap-1 text-[17px] font-medium text-cyan-300 hover:text-white">
                   Visit the pasture <ArrowRight size={17} className="transition-transform group-hover:translate-x-0.5" />
                 </a>
               </div>
             </motion.div>
+            <button
+              type="button"
+              onClick={() => howRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              className="press mt-14 flex w-fit items-center gap-3 rounded-full bg-white/[0.08] py-2 pl-2 pr-5 text-[15px] font-medium text-slate-200 ring-1 ring-white/15 hover:bg-white/[0.12] hover:text-white"
+            >
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-white text-slate-950">
+                <ChevronDown size={18} strokeWidth={2.5} className="animate-bounce [animation-duration:1.6s]" />
+              </span>
+              Scroll to learn more
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => howRef.current?.scrollIntoView({ behavior: 'smooth' })}
-            className="absolute bottom-7 left-1/2 -translate-x-1/2 text-slate-400 hover:text-white"
-            aria-label="Scroll to learn more"
-          >
-            <ChevronDown size={26} className="animate-bounce" />
-          </button>
+          <div className="relative h-[62vh] p-3 pt-[68px] md:h-auto md:pl-0">
+            <div className="relative h-full overflow-hidden rounded-[32px] ring-1 ring-white/10">
+              <PastureScene />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/35 to-transparent" />
+              <a href="#/pasture" className="panel press absolute bottom-4 left-4 flex items-center gap-1.5 !rounded-full px-3.5 py-1.5 text-[13px] font-medium text-white">
+                Live 3D · step into the pasture <ArrowRight size={14} />
+              </a>
+            </div>
+          </div>
         </section>
 
         {/* The problem */}

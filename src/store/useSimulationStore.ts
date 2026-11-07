@@ -150,7 +150,8 @@ if (typeof window !== 'undefined') {
     for (let k = 0; k < 10; k++) {
       runCounterfactuals(DEFAULT_CRISIS, {
         ...SMART_PROTOCOL,
-        misters: k % 2 === 0,
+        misterPct: k % 2 === 0 ? 100 : 50,
+        fanBoostPct: (k % 5) * 20,
         isolate: k % 3 !== 0,
         rebalance: k % 4 !== 0,
         abx: k % 5 === 0 ? 'blanket' : 'targeted',

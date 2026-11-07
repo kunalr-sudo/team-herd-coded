@@ -131,3 +131,46 @@ export function AnimatedNumber({ value, format = (v) => Math.round(v).toLocaleSt
   }, [mv, value])
   return <motion.span className="tabular-nums">{text}</motion.span>
 }
+
+/** 0–100 % slider in fixed steps, with tick marks so each step is visible. */
+export function StepSlider({
+  value,
+  onChange,
+  label,
+  step = 10,
+  color = '#22d3ee',
+}: {
+  value: number
+  onChange: (v: number) => void
+  label: string
+  step?: number
+  color?: string
+}) {
+  const ticks = Array.from({ length: 100 / step + 1 }, (_, k) => k * step)
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label={label}
+        aria-valuetext={`${value}%`}
+        className="ios-slider"
+        style={{ ['--fill' as string]: `${value}%`, ['--fill-bg' as string]: color }}
+      />
+      <div className="mx-[13px] -mt-1 flex justify-between" aria-hidden>
+        {ticks.map((t) => (
+          <span key={t} className={`h-1 w-px ${t <= value ? 'bg-white/50' : 'bg-white/20'}`} />
+        ))}
+      </div>
+      <div className="mt-0.5 flex justify-between text-[11.5px] text-slate-500" aria-hidden>
+        <span>Off</span>
+        <span>50%</span>
+        <span>Max</span>
+      </div>
+    </div>
+  )
+}
